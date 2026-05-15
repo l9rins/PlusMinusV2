@@ -1,0 +1,26 @@
+name = "nba-data-worker"
+main = "workers/worker.js"
+compatibility_date = "2024-11-01"
+
+# ── Cron: pre-warm all caches every 6 hours ───────────────────────────────────
+[triggers]
+crons = ["0 */6 * * *"]
+
+# ── KV namespace — create with: wrangler kv:namespace create PM_CACHE ─────────
+# Then replace the id below with the output from that command.
+[[kv_namespaces]]
+binding = "PM_CACHE"
+id = "466c530fd2d447ecaded2aff85dc733e"
+
+# ── Environment variables ─────────────────────────────────────────────────────
+[vars]
+# Your Groq API key (free at console.groq.com)
+# For production, use: wrangler secret put GROQ_API_KEY  (keeps it out of git)
+
+# URL of your deployed Python backend
+# Local dev: leave empty (worker falls back to localhost:8000)
+# Production: set to your Railway/Render/Fly.io URL e.g. https://plusminus-api.railway.app
+
+# Allowed frontend origins (comma-separated, no trailing slash)
+# Your Cloudflare Pages URL goes here
+ALLOWED_ORIGINS = "http://localhost:8080,http://localhost:3000,http://localhost:5500,http://127.0.0.1:8080,http://127.0.0.1:3000,http://127.0.0.1:5500"

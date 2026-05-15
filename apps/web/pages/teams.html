@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23c5f82a'/><text x='4' y='24' font-family='monospace' font-size='20' font-weight='900' fill='%2305050a'>+−</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Plus-Minus NBA — 30 NBA teams ranked by playoff probability, schedule, and performance metrics." />
+  <meta property="og:title" content="Plus-Minus — NBA Teams" />
+  <meta property="og:description" content="30 NBA teams ranked by playoff probability and performance." />
+  <title>Teams | Plus-Minus NBA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&display=swap"
+    onload="this.rel='stylesheet'" />
+
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=optional"
+    onload="this.rel='stylesheet'" />
+
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter+Tight:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  </noscript>
+  <link rel="stylesheet" href="../styles/shared.css" />
+  <link rel="stylesheet" href="../styles/dashboard.css" />
+  <link rel="stylesheet" href="../styles/motion.css" />
+  <link rel="stylesheet" href="../styles/teams.css" />
+  <script src="../scripts/data.js" defer></script>
+  <script src="../scripts/shared.js" defer></script>
+  <script src="../scripts/teams.js" defer></script>
+  <script src="../scripts/motion.js" defer></script>
+</head>
+
+<body>
+  <!-- SVG Icons (same sprite as home.html) -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="icon-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
+    </symbol>
+    <symbol id="icon-trending-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></symbol>
+    <symbol id="icon-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+    <symbol id="icon-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="icon-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
+    <symbol id="icon-layout-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol>
+    <symbol id="icon-bar-chart-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></symbol>
+    <symbol id="icon-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978"/><path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978"/><path d="M18 9h1.5a1 1 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6 9H4.5a1 1 0 0 1 0-5H6"/></symbol>
+    <symbol id="icon-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></symbol>
+    <symbol id="icon-crosshair" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/></symbol>
+    <symbol id="icon-gavel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3l8.384-8.381"/><path d="m16 16 6-6"/><path d="m21.5 10.5-8-8"/><path d="m8 8 6-6"/><path d="m8.5 7.5 8 8"/></symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+    <symbol id="icon-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+  </svg>
+
+  <div class="grid-bg"></div>
+
+  <!-- MOBILE SIDEBAR OVERLAY -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="mainSidebar">
+    <div class="sidebar-header">
+      <a href="home.html" class="logo">
+        <div class="logo-mark">
+          <svg viewBox="0 0 20 20" fill="none" width="16" height="16"><text x="1" y="14" font-family="monospace" font-size="13" font-weight="900" fill="var(--bg)">+−</text></svg>
+        </div>
+        <span class="logo-plus">PLUS</span>-MINUS
+      </a>
+      <!-- Hamburger toggle (visible on mobile only) -->
+      <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="logo-sub">NBA INTELLIGENCE PLATFORM</div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted2);margin-left:34px;margin-top:2px">
+        <span id="pmSeasonLabel">LOADING…</span>
+      </div>
+      <div class="live-row">
+        <div class="live-indicator">
+          <div class="live-dot"></div>LIVE
+        </div>
+        <div class="live-badge">LOADING…</div>
+      </div>
+    </div>
+
+    <!-- LIVE GAME SIDEBAR -->
+    <div class="team-section" id="sidebarGames">
+      <div class="section-label" id="sidebarDateLabel">LOADING…</div>
+    </div>
+
+    <nav class="sidebar-nav" id="sideNav" style="position:relative">
+      <div id="navRail" aria-hidden="true"></div>
+      <div class="nav-section">MAIN</div>
+      <a class="nav-item" href="home.html">
+        <svg class="lucide-icon" width="16" height="16"><use href="#icon-layout-dashboard" /></svg>
+        Overview
+      </a>
+      <a class="nav-item active" href="teams.html">
+        <svg class="lucide-icon" width="16" height="16"><use href="#icon-users" /></svg>
+        Teams<span class="ni-badge">5</span>
+      </a>
+      <a class="nav-item" href="players.html">
+        <svg class="lucide-icon" width="16" height="16"><use href="#icon-bar-chart-2" /></svg>
+        Players
+      </a>
+      <a class="nav-item" href="standings.html">
+        <svg class="lucide-icon" width="16" height="16"><use href="#icon-trophy" /></svg>
+        Standings
+      </a>
+      <a class="nav-item" href="schedule.html">
+        <svg class="lucide-icon" width="16" height="16"><use href="#icon-calendar" /></svg>
+        Schedule
+      </a>
+      <div class="nav-section">INTELLIGENCE</div>
+      <a class="nav-item" href="predictions.html"><svg class="lucide-icon" aria-hidden="true" width="16" height="16">
+          <use href="#icon-trending-up" />
+        </svg>Predictions <span class="nav-badge-ai">AI</span></a>
+      <div class="nav-section">ADVANCED</div>
+      <a class="nav-item" href="#"><svg class="lucide-icon" aria-hidden="true" width="16" height="16">
+          <use href="#icon-crosshair" />
+        </svg>Hot Zones</a>
+      <a class="nav-item" href="#"><svg class="lucide-icon" aria-hidden="true" width="16" height="16">
+          <use href="#icon-users" />
+        </svg>Lineup Lab</a>
+      <a class="nav-item" href="#"><svg class="lucide-icon" aria-hidden="true" width="16" height="16">
+          <use href="#icon-gavel" />
+        </svg>Referee Watch</a>
+      <a class="nav-item" href="#"><svg class="lucide-icon" aria-hidden="true" width="16" height="16">
+          <use href="#icon-zap" />
+        </svg>Clutch Stats</a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div
+        style="padding:6px 7px;font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;border-top:1px solid var(--border);padding-top:10px">
+        DATA: Basketball Reference · ESPN · NBA.com<br>
+        <span style="color:var(--muted2)"><span id="dataTimestamp">Updated 2 min ago</span></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:0">
+        <div class="breadcrumb"><span>Plus-Minus</span><span class="sep">/</span><span class="current">Teams</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="search-box">
+          <svg class="lucide-icon" aria-hidden="true" width="16" height="16"
+            style="width:12px;height:12px;color:var(--muted)">
+            <use href="#icon-search" />
+          </svg>
+          <input type="search" id="globalSearch" placeholder="Search player, team..." aria-label="Search"
+            oninput="handleGlobalSearch(this.value)" />
+        </div>
+        <button class="icon-btn" aria-label="Notifications"><svg class="lucide-icon" aria-hidden="true" width="16"
+            height="16" style="width:16px;height:16px">
+            <use href="#icon-bell" />
+          </svg></button>
+        <button class="icon-btn" aria-label="Settings"><svg class="lucide-icon" aria-hidden="true" width="16"
+            height="16" style="width:16px;height:16px">
+            <use href="#icon-settings" />
+          </svg></button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Page Header -->
+      <div class="teams-page-header">
+        <div class="teams-page-title">
+          <svg class="lucide-icon" aria-hidden="true" width="20" height="20" style="color:var(--lime)">
+            <use href="#icon-users" />
+          </svg>
+          <h1>NBA Teams</h1>
+        </div>
+        <p class="teams-page-sub">30 teams ranked by playoff probability and performance</p>
+        <div class="teams-summary" id="teamsSummary" aria-label="Teams summary"></div>
+      </div>
+
+      <!-- Toolbar: Conference Filter + Sort Controls -->
+      <div class="teams-toolbar">
+        <div class="filter-group">
+          <label for="conferenceFilter" class="filter-label">Conference</label>
+          <select id="conferenceFilter" class="filter-select">
+            <option value="all">All Teams</option>
+            <option value="east">Eastern Conference</option>
+            <option value="west">Western Conference</option>
+          </select>
+        </div>
+
+        <div class="sort-group">
+          <label for="sortSelect" class="filter-label">Sort by</label>
+          <select id="sortSelect" class="filter-select">
+            <option value="playoff_prob">Playoff Probability (↓)</option>
+            <option value="wins">Wins (↓)</option>
+            <option value="record">Seed (↑)</option>
+          </select>
+        </div>
+
+        <div class="data-badge-container">
+          <div class="data-badge" id="standingsBadge">
+            <span class="badge-label">Standings</span>
+            <span class="badge-age" id="standingsAge">loading…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Teams Grid: Skeleton + Content -->
+      <div class="teams-grid" id="teamsGrid">
+        <!-- Skeleton cards injected here -->
+      </div>
+    </div>
+  </main>
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <a href="home.html" class="mn-item">
+      <svg width="18" height="18">
+        <use href="#icon-layout-dashboard" />
+      </svg>
+      <span>Home</span>
+    </a>
+    <a href="players.html" class="mn-item">
+      <svg width="18" height="18">
+        <use href="#icon-bar-chart-2" />
+      </svg>
+      <span>Stats</span>
+    </a>
+    <a href="predictions.html" class="mn-item">
+      <svg width="18" height="18">
+        <use href="#icon-trending-up" />
+      </svg>
+      <span>Predict</span>
+    </a>
+    <a href="standings.html" class="mn-item">
+      <svg width="18" height="18">
+        <use href="#icon-trophy" />
+      </svg>
+      <span>Standings</span>
+    </a>
+  </nav>
+
+  <!-- Hamburger toggle script -->
+  <script>
+    (function() {
+      const btn = document.getElementById('hamburgerBtn');
+      const sidebar = document.getElementById('mainSidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      if (!btn || !sidebar) return;
+      function toggle() {
+        const open = sidebar.classList.toggle('mobile-open');
+        btn.classList.toggle('open', open);
+        btn.setAttribute('aria-expanded', String(open));
+        if (overlay) overlay.classList.toggle('active', open);
+        document.body.classList.toggle('sidebar-open', open);
+      }
+      btn.addEventListener('click', toggle);
+      if (overlay) overlay.addEventListener('click', toggle);
+    })();
+  </script>
+
+</body>
+
+</html>

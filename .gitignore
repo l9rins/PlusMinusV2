@@ -1,0 +1,42 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+tests/pytest-cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node and Cloudflare
+node_modules/
+.wrangler/
+.dev.vars
+dist/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+
+# Model artifacts and outputs
+*.joblib
+*.pkl
+*.model
+models/
+model_metrics.json
+
+# Local test/output databases
+*.sqlite
+

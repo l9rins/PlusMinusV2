@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "plus-minus",
+  "compatibility_date": "2026-04-24",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "apps/web"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
