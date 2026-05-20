@@ -27,9 +27,9 @@ window.addEventListener('error', e => {
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURATION
 // ─────────────────────────────────────────────────────────────────────────────
+const PM_IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '8080' || window.location.port === '4035';
 const PM_WORKER = 'https://nba-data-worker.lorenzbarangan112.workers.dev';
 const PM_LOCAL_BACKEND = 'http://localhost:8000';
-const PM_IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '8080';
 const PM_NBA_TIME_ZONE = 'America/New_York';
 
 /** Is the page served from the filesystem? (live data disabled) */
@@ -189,17 +189,42 @@ async function workerFetch(path, timeoutMs = 9000, retries = 2) {
         '/api/lineups',
         '/api/play_types',
         '/api/injuries',
+        '/api/team_stats',
       ].some(prefix => path.startsWith(prefix));
-      const baseUrl = usesBackend ? resolvePredictionApiBase() : PM_WORKER;
-      const res = await fetch(`${baseUrl}${path}`, { signal: controller.signal });
-      clearTimeout(timer);
-      if (res.status === 429) {
-        // Rate-limited: honour Retry-After header
-        const wait = Math.min(Number(res.headers.get('Retry-After') || 2) * 1000, 8000);
-        await new Promise(r => setTimeout(r, wait));
-        continue;
+      const primaryBase = usesBackend ? resolvePredictionApiBase() : PM_WORKER;
+      const fallbackBase = usesBackend && primaryBase === PM_LOCAL_BACKEND ? PM_WORKER : null;
+
+      const fetchFromBase = async (baseUrl) => {
+        const res = await fetch(`${baseUrl}${path}`, { signal: controller.signal });
+        if (res.status === 429) {
+          const wait = Math.min(Number(res.headers.get('Retry-After') || 2) * 1000, 8000);
+          await new Promise(r => setTimeout(r, wait));
+          return null;
+        }
+        if (!res.ok) throw Object.assign(new Error(`Worker ${path} → ${res.status}`), { status: res.status });
+        return res;
+      };
+
+      let res = null;
+      let primaryError = null;
+      try {
+        res = await fetchFromBase(primaryBase);
+      } catch (err) {
+        primaryError = err;
       }
-      if (!res.ok) throw Object.assign(new Error(`Worker ${path} → ${res.status}`), { status: res.status });
+
+      if (!res && fallbackBase) {
+        try {
+          res = await fetchFromBase(fallbackBase);
+        } catch (fallbackError) {
+          throw primaryError || fallbackError;
+        }
+      } else if (primaryError) {
+        throw primaryError;
+      }
+
+      clearTimeout(timer);
+      if (!res) continue;
       return res.json();
     } catch (err) {
       clearTimeout(timer);

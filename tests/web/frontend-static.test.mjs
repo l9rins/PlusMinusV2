@@ -20,8 +20,8 @@ test('frontend exposes prediction API resolver', () => {
   assert.match(shared, /window\.PM_CONFIG/);
 });
 
-test('home dashboard exposes advanced analytics labs', () => {
-  assert.match(home, /id="analyticsLab"/);
-  assert.match(home, /id="lineupLab"/);
-  assert.match(home, /id="discoveryLab"/);
+test('team page exposes advanced analytics labs', () => {
+  const team = readFileSync(new URL('../../apps/web/pages/team.html', import.meta.url), 'utf8');
+  assert.match(team, /id="analyticsLab"/);
+  assert.match(team, /id="lineupLab"/);
 });

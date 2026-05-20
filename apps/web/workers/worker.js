@@ -95,25 +95,37 @@ const CORS = {
 };
 
 // Set ALLOWED_ORIGINS in wrangler.toml [vars] or via `wrangler secret put ALLOWED_ORIGINS`.
-// Comma-separated, e.g. "https://myapp.pages.dev,http://localhost:8080"
-const _DEFAULT_ORIGINS = [
+// Comma-separated, e.g. "https://myapp.pages.dev"
+// Note: all localhost / 127.0.0.1 origins are always allowed in development.
+const _DEFAULT_ORIGINS = new Set([
   'http://localhost:8080', 'http://localhost:3000', 'http://localhost:5500',
   'http://127.0.0.1:8080', 'http://127.0.0.1:3000', 'http://127.0.0.1:5500',
-];
+]);
+
+/** Returns true if the origin is any localhost / loopback port — always safe to allow in dev. */
+function _isLocalOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
 
 /** Build CORS headers with origin checking — blocks requests from unknown origins. */
 function corsHeaders(request, env) {
   const origin = request?.headers?.get('Origin') ?? '';
-  const allowed = env?.ALLOWED_ORIGINS
+  const explicit = env?.ALLOWED_ORIGINS
     ? new Set(env.ALLOWED_ORIGINS.split(',').map(s => s.trim()))
-    : new Set(_DEFAULT_ORIGINS);
+    : _DEFAULT_ORIGINS;
 
   const headers = {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Vary': 'Origin',
   };
-  if (allowed.has(origin)) {
+  // Allow any localhost/127.0.0.1 origin (any port) plus explicit production list
+  if (_isLocalOrigin(origin) || explicit.has(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
   }
   return headers;

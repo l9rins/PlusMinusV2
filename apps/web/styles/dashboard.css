@@ -3887,8 +3887,8 @@ body {
 .lineup-layout {
   display: grid;
   grid-template-columns: minmax(280px, .95fr) minmax(300px, 1fr) minmax(260px, .85fr);
-  gap: 10px;
-  padding: 14px;
+  gap: 6px;
+  padding: 10px;
 }
 
 .builder-column,
@@ -3907,15 +3907,24 @@ body {
 }
 
 .player-chip {
-  min-height: 54px;
-  padding: 9px;
+  min-height: 46px;
+  padding: 7px 8px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, .03);
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
+  transition: all .15s var(--spring);
+}
+.player-chip:hover {
+  border-color: var(--border2);
+  transform: translateX(2px);
+  background: rgba(255,255,255,.05);
+}
+.player-chip:active {
+  transform: scale(.98);
 }
 
 .player-chip input {
@@ -3928,19 +3937,26 @@ body {
 }
 
 .pc-name {
-  font-size: 12px;
+  display: block;
+  font-size: 11px;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
 }
 
 .pc-role {
-  margin-top: 2px;
+  display: block;
+  margin-top: 1px;
   font-family: var(--mono);
   font-size: 8px;
   color: var(--muted);
   letter-spacing: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .pc-impact {
@@ -3953,10 +3969,10 @@ body {
 .lineup-summary {
   border: 1px solid rgba(197, 248, 42, .16);
   background: rgba(197, 248, 42, .035);
-  padding: 12px;
+  padding: 8px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .summary-stat b,
@@ -3989,11 +4005,16 @@ body {
 .matchup-row {
   display: grid;
   grid-template-columns: 1fr 70px 70px;
-  min-height: 42px;
+  min-height: 36px;
   border-bottom: 1px solid var(--border);
   align-items: center;
   padding: 0 10px;
   gap: 8px;
+  transition: background .15s, transform .15s var(--spring);
+}
+.matchup-row:hover {
+  background: rgba(255,255,255,.025);
+  transform: translateX(2px);
 }
 
 .matchup-row:last-child {
@@ -4039,8 +4060,14 @@ body {
 .pairing-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  transition: all .15s var(--spring);
+}
+.pairing-row:hover {
+  border-color: var(--border2);
+  transform: translateX(2px);
+  box-shadow: -2px 0 0 var(--lime);
 }
 
 .pairing-row strong {
@@ -4089,8 +4116,13 @@ body {
   grid-template-columns: 1fr auto;
   gap: 8px;
   align-items: center;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--border);
+  transition: background .15s, transform .15s var(--spring);
+}
+.data-row:hover {
+  background: rgba(255,255,255,.025);
+  transform: translateX(2px);
 }
 
 .data-row:last-child {

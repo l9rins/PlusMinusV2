@@ -49,7 +49,9 @@ const TEAM_LOGO_IDS = {
   SA: 1610612759,
   TOR: 1610612761,
   UTA: 1610612762,
+  UTAH: 1610612762,
   WAS: 1610612764,
+  WSH: 1610612764,
 };
 
 const SKELETON_CARD_COUNT = 6;
@@ -281,43 +283,47 @@ function renderTeamsSummary(teams) {
 
 function renderTeamCard(team) {
   const recordStr = `${team.w}-${team.l}`;
-  const pctStr = team.pct; // e.g., ".625"
-  const playoffLabel = formatPlayoffEstimate(team.playoffProb);
+  const pctNum = Number(team.pct) || 0;
+  const pctDisplay = pctNum > 1 ? pctNum.toFixed(0) + '%' : (pctNum * 100).toFixed(1) + '%';
   const logoUrl = getTeamLogoUrl(team.abbr);
-  
+  const conf = team.conference === 'E' ? 'EAST' : 'WEST';
+  const prob = team.playoffProb;
+  const probColor = prob >= 90 ? 'var(--lime)' : prob >= 60 ? 'var(--blue)' : prob >= 30 ? 'var(--muted)' : 'var(--muted2)';
+  const seedLabel = team.seed <= 6 ? 'Playoff' : team.seed <= 10 ? 'Play-In' : 'Lottery';
+  const seedColor = team.seed <= 6 ? 'var(--lime)' : team.seed <= 10 ? 'var(--blue)' : 'var(--muted)';
+  const winBarPct = Math.round((Number(team.w) / Math.max(Number(team.w) + Number(team.l), 1)) * 100);
+
   return `
-    <a class="team-card" href="team.html?team=${esc(team.abbr)}">
-      <div class="card-header" style="border-bottom-color: ${esc(team.color)}30">
-        <div class="team-mark">
-          <div class="team-logo-wrap">
-            <img class="team-logo" src="${esc(logoUrl)}" alt="${esc(team.name)} logo" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
-            <div class="team-logo-fallback" style="display:none;color:${esc(team.color)}">${esc(team.abbr)}</div>
+    <a class="team-card" href="team.html?team=${esc(team.abbr)}" style="--card-accent:${esc(team.color)}">
+      <div class="tc-accent" style="background:${esc(team.color)}"></div>
+      <div class="tc-header">
+        <div class="tc-logo-area">
+          <div class="tc-logo-wrap">
+            <img class="tc-logo" src="${esc(logoUrl)}" alt="${esc(team.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+            <div class="tc-logo-fallback" style="display:none;color:${esc(team.color)}">${esc(team.abbr)}</div>
           </div>
-          <div class="team-abbr" style="color: ${esc(team.color)}">${esc(team.abbr)}</div>
+          <div class="tc-identity">
+            <div class="tc-abbr" style="color:${esc(team.color)}">${esc(team.abbr)}</div>
+            <div class="tc-name">${esc(team.name)}</div>
+          </div>
         </div>
-        <div class="seed-badge">Seed ${team.seed}</div>
+        <div class="tc-seed-wrap">
+          <span class="tc-seed" style="color:${seedColor}">#${team.seed}</span>
+          <span class="tc-conf">${conf}</span>
+        </div>
       </div>
-      
-      <div class="card-body">
-        <div class="team-name">${esc(team.name)}</div>
-        
-        <div class="stat-row">
-          <span class="stat-label">Record</span>
-          <span class="stat-value">${esc(recordStr)}</span>
+      <div class="tc-body">
+        <div class="tc-record-row">
+          <span class="tc-record">${esc(recordStr)}</span>
+          <span class="tc-winpct">${pctDisplay}</span>
         </div>
-        
-        <div class="stat-row">
-          <span class="stat-label">Win %</span>
-          <span class="stat-value">${esc(pctStr)}</span>
-        </div>
-        
-        <div class="stat-row">
-          <span class="stat-label">Streak</span>
-          <span class="stat-value">${esc(team.streak || 'N/A')}</span>
-        </div>
-        
-        <div class="playoff-est">
-          <span class="playoff-label">${playoffLabel}</span>
+        <div class="tc-bar-track"><div class="tc-bar-fill" style="width:${winBarPct}%;background:${esc(team.color)}"></div></div>
+        <div class="tc-bottom">
+          <div class="tc-streak">${esc(team.streak || 'N/A')}</div>
+          <div class="tc-playoff">
+            <span class="tc-prob-label">${seedLabel}</span>
+            <span class="tc-prob-value" style="color:${probColor}">${prob}%</span>
+          </div>
         </div>
       </div>
     </a>

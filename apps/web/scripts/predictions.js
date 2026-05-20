@@ -368,15 +368,5 @@ document.addEventListener('DOMContentLoaded', () => {
   // Auto-load slate on page load
   loadPredictionSlate();
 
-  // Nav rail positioning
-  const activeNav = document.querySelector('.nav-item.active');
-  if (activeNav) {
-    const rail = document.getElementById('navRail');
-    const nav = document.getElementById('sideNav');
-    if (rail && nav) {
-      const navRect = nav.getBoundingClientRect();
-      const itemRect = activeNav.getBoundingClientRect();
-      rail.style.top = (itemRect.top - navRect.top + nav.scrollTop) + 'px';
-    }
-  }
+
 });

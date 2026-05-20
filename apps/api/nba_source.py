@@ -75,7 +75,7 @@ def fetch_player_game_log(player_id: int, season: Optional[str] = None) -> List[
         try:
             params = {}
             if season:
-                params['season_nullable'] = season
+                params['season'] = season
             pg = PlayerGameLog(player_id=player_id, **params)
             # small delay safety is handled by caller if calling many players
             df = pg.get_data_frames()[0]

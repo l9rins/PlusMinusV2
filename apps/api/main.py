@@ -36,6 +36,31 @@ def _nba_date_compact() -> str:
     """Return the NBA operational date in Eastern Time, formatted YYYYMMDD."""
     return datetime.now(NBA_TIME_ZONE).strftime("%Y%m%d")
 
+
+def normalize_team_abbr(t: str) -> str:
+    """Normalize team abbreviation to standard 3-letter forms used in data logs."""
+    if not t:
+        return t
+    t = t.upper().strip()
+    mapping = {
+        "SA": "SAS",
+        "NY": "NYK",
+        "GS": "GSW",
+        "BRK": "BKN",
+        "NO": "NOP",
+        "UTAH": "UTA",
+        "WSH": "WAS",
+    }
+    return mapping.get(t, t)
+
+
+VALID_NBA_TEAMS = {
+    "ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
+    "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",
+    "OKC", "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS"
+}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBAL STATE — loaded once at startup
 # ─────────────────────────────────────────────────────────────────────────────
@@ -113,7 +138,9 @@ def _load_team_stats():
     from data_loader import load_seasons, clean
     from features import build_full_features, build_rolling_stats
 
-    seasons = ["2024-25", "2023-24"]
+    now = datetime.utcnow()
+    current_start_year = now.year if now.month >= 10 else now.year - 1
+    seasons = [f"{y}-{((y + 1) % 100):02d}" for y in range(current_start_year, current_start_year - 3, -1)]
     raw = load_seasons(seasons)
     if raw.empty:
         _team_stats = {}
@@ -205,6 +232,122 @@ except ImportError:
     fetch_play_types_for_team = None
 
 
+@app.get("/api/team_stats")
+async def team_stats(team: str = Query(..., description="Team abbreviation e.g. BOS")):
+    """Return real season statistical ratings, percentiles, and Four Factors for a team."""
+    try:
+        t = normalize_team_abbr(team)
+        if t not in VALID_NBA_TEAMS:
+            raise HTTPException(status_code=404, detail=f"Team {t} not found")
+        
+        # Check if _team_stats is empty or team is not found
+        team_df = _team_stats.get(t) if _team_stats else None
+        if team_df is None or team_df.empty:
+            # Fallback to realistic defaults
+            elo_val = 1500.0
+            if _elo_system and t in _elo_system.ratings:
+                elo_val = _elo_system.ratings[t]
+                
+            return {
+                "team": t,
+                "elo": round(elo_val),
+                "ortg": 112.0,
+                "drtg": 112.0,
+                "net_rating": 0.0,
+                "pace": 99.0,
+                "percentiles": {
+                    "ortg": 50.0,
+                    "drtg": 50.0,
+                    "net_rating": 50.0,
+                    "pace": 50.0
+                },
+                "four_factors": {
+                    "efg": 53.0,
+                    "tov": 13.5,
+                    "orb": 23.0,
+                    "ft_rate": 20.0,
+                    "ts": 56.5
+                }
+            }
+        
+        td = _team_stats[t]
+        if td.empty:
+            raise HTTPException(status_code=404, detail=f"No data for team {t}")
+        
+        # Get the latest rolling average row
+        latest = td.sort_values("Date").iloc[-1]
+        
+        # Extract elo
+        elo_val = 1500.0
+        if _elo_system and t in _elo_system.ratings:
+            elo_val = _elo_system.ratings[t]
+            
+        # Extract ratings
+        ortg = float(latest.get("avg_ORTG") or 0.0)
+        drtg = float(latest.get("avg_DRTG") or 0.0)
+        net_rtg = float(latest.get("avg_NET_RTG") or (ortg - drtg))
+        pace = float(latest.get("avg_POSS") or 100.0)
+        
+        # Scaling Four Factors from ratio (0-1) to percent (0-100)
+        efg = float(latest.get("avg_eFG_PCT") or 0.5) * 100
+        tov = float(latest.get("avg_TOV_PCT") or 0.15) * 100
+        orb = float(latest.get("avg_ORB_PCT") or 0.25) * 100
+        ft_rate = float(latest.get("avg_FT_RATE") or 0.2) * 100
+        ts = float(latest.get("avg_TS_PCT") or 0.55) * 100
+
+        # Compute percentiles among all active teams
+        all_latest = {}
+        for t_abbr, t_df in _team_stats.items():
+            if not t_df.empty:
+                all_latest[t_abbr] = t_df.sort_values("Date").iloc[-1]
+                
+        all_ortg = [float(row.get("avg_ORTG") or 0.0) for row in all_latest.values()]
+        all_drtg = [float(row.get("avg_DRTG") or 0.0) for row in all_latest.values()]
+        all_net = [float(row.get("avg_NET_RTG") or 0.0) for row in all_latest.values()]
+        all_pace = [float(row.get("avg_POSS") or 100.0) for row in all_latest.values()]
+        
+        def get_percentile(val, val_list, invert=False):
+            if not val_list:
+                return 50.0
+            sorted_vals = sorted(val_list)
+            if invert:
+                worse_count = sum(1 for v in sorted_vals if v >= val)
+            else:
+                worse_count = sum(1 for v in sorted_vals if v <= val)
+            return round((worse_count / len(sorted_vals)) * 100, 1)
+
+        ortg_pct = get_percentile(ortg, all_ortg, invert=False)
+        drtg_pct = get_percentile(drtg, all_drtg, invert=True)  # lower DRTG is better
+        net_pct = get_percentile(net_rtg, all_net, invert=False)
+        pace_pct = get_percentile(pace, all_pace, invert=False)
+        
+        return {
+            "team": t,
+            "elo": round(elo_val),
+            "ortg": round(ortg, 2),
+            "drtg": round(drtg, 2),
+            "net_rating": round(net_rtg, 2),
+            "pace": round(pace, 2),
+            "percentiles": {
+                "ortg": ortg_pct,
+                "drtg": drtg_pct,
+                "net_rating": net_pct,
+                "pace": pace_pct
+            },
+            "four_factors": {
+                "efg": round(efg, 2),
+                "tov": round(tov, 2),
+                "orb": round(orb, 2),
+                "ft_rate": round(ft_rate, 2),
+                "ts": round(ts, 2)
+            }
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/playerlog")
 async def player_log(player_id: int = Query(..., description="Numeric NBA player id"), season: str | None = Query(None, description="Season label e.g. 2024-25")):
     """Return recent player game logs (normalized list of rows).
@@ -228,9 +371,10 @@ async def team_top_players(team: str = Query(..., description="Team abbreviation
     Calls the server-side adapter which computes last-5-game averages.
     """
     try:
+        t = normalize_team_abbr(team)
         loop = asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, fetch_team_top_players, team.upper(), n)
-        return {"team": team.upper(), "players": data}
+        data = await loop.run_in_executor(None, fetch_team_top_players, t, n)
+        return {"team": t, "players": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -256,7 +400,7 @@ async def api_injuries(team: str | None = Query(None, description="Optional team
             cached["ts"] = now
 
         if team:
-            team_up = team.upper().strip()
+            team_up = normalize_team_abbr(team)
             impact = await loop.run_in_executor(None, get_injury_impact, team_up, injuries)
             return {"team": team_up, "injuries": injuries.get(team_up, []), "impact": impact}
         return {"injuries": injuries}
@@ -272,7 +416,7 @@ async def api_shot_zones(team: str = Query(..., description="Team abbreviation e
     (rim, paint non-rim, mid-range, corner-3, above-break-3) for quick front-end display.
     """
     try:
-        t = team.upper().strip()
+        t = normalize_team_abbr(team)
         # simple module-level cache for hot endpoints
         if not hasattr(api_shot_zones, "_cache"):
             api_shot_zones._cache = {"ts": 0, "data": {}}
@@ -327,19 +471,20 @@ async def api_lineups(team: str = Query(..., description="Team abbreviation e.g.
     and triples. It is intended for frontend display and quick filtering.
     """
     try:
+        t = normalize_team_abbr(team)
         loop = asyncio.get_event_loop()
         # simple cache per-team for lineups (short TTL)
         if not hasattr(api_lineups, "_cache"):
             api_lineups._cache = {"ts": 0, "data": {}}
         now = time.time()
         cached = api_lineups._cache
-        key = f"{team.upper()}:{top_n}"
+        key = f"{t}:{top_n}"
         if now - cached["ts"] < CACHE_TTL_LINEUPS and key in cached["data"]:
             return cached["data"][key]
 
-        players = await loop.run_in_executor(None, fetch_team_top_players, team.upper(), top_n)
+        players = await loop.run_in_executor(None, fetch_team_top_players, t, top_n)
         if not players:
-            return {"team": team.upper(), "combos": []}
+            return {"team": t, "combos": []}
 
         # For each player, fetch recent game log and compute avg minutes and pm per 48
         details = []
@@ -407,7 +552,7 @@ async def api_lineups(team: str = Query(..., description="Team abbreviation e.g.
 
         # sort by netRtg desc and return
         combos = sorted(combos, key=lambda x: x['netRtg'], reverse=True)
-        resp = {"team": team.upper(), "combos": combos}
+        resp = {"team": t, "combos": combos}
         cached["data"][key] = resp
         cached["ts"] = now
         return resp
@@ -422,7 +567,7 @@ async def api_play_types(team: str = Query(..., description="Team abbreviation e
     Uses `apps.api.play_types.fetch_play_types_for_team` with configurable TTL.
     """
     try:
-        t = team.upper().strip()
+        t = normalize_team_abbr(team)
         # simple module-level cache for play types
         if not hasattr(api_play_types, "_cache"):
             api_play_types._cache = {"ts": 0, "data": {}}

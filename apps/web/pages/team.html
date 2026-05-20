@@ -29,180 +29,7 @@
   <link rel="stylesheet" href="../styles/motion.css" />
   <link rel="stylesheet" href="../styles/team.css" />
 
-  <!-- Compactness + Interactivity overrides -->
-  <style>
-    :root { --compact-pad-v:14px; --compact-pad-h:18px; }
-
-    /* ── GLOBAL COMPACT SPACING ── */
-    .lab-shell, .panel { padding: var(--compact-pad-v) var(--compact-pad-h) !important; margin-bottom: 12px !important; }
-    .lab-shell > * { gap: 8px !important; }
-    .panel { font-size: 13px; }
-    .panel.analytics-panel { margin-bottom: 12px !important; }
-
-    /* ── FONT SIZES (hard rules) ── */
-    .stat-card-value, .adv-value, .identity-value, .rating-value, .metric-value, .factor-value { font-size:22px !important; }
-    .stat-card-label, .context-label, .panel-kicker, .adv-label, .identity-label,
-    .rating-label, .lineup-label, .factor-label, .vital-label { font-size:11px !important; }
-    .stat-card-subvalue, .context-meta, .adv-detail, .identity-detail, .rating-detail { font-size:10px !important; }
-
-    /* ── SPARKLINES: exactly 80×24 ── */
-    .trend-sparkline, .micro-bar-chart, .trajectory-sparkline { width:80px !important; height:24px !important; }
-    .trend-sparkline svg, .micro-bar-chart svg { width:80px; height:24px; }
-
-    /* ── CHART SIZES (hard pixel caps) ── */
-    #courtHeatmapSvg { max-width:220px !important; max-height:180px !important; width:220px; height:180px; }
-    #fourFactorsRadarWrap { max-width:160px; max-height:160px; }
-    #fourFactorsRadarWrap svg { max-width:160px; max-height:160px; width:160px; height:160px; }
-    #playTypeScatterWrap > svg { max-width:180px; max-height:160px; width:180px; height:160px; }
-    #advancedRadarWrap { max-width:200px; max-height:200px; }
-    #advancedRadarWrap svg { max-width:200px; max-height:200px; width:200px; height:200px; }
-    #ratingTimelineChart { max-height:140px !important; }
-    .timeline-chart-container { height:140px !important; }
-    .heatmap-col, .radar-col { padding:8px !important; }
-    .efficiency-grid { gap:12px !important; padding:10px !important; }
-
-    /* ── CARDS & PADDING ── */
-    .stat-card { padding:10px !important; min-height:auto !important; }
-    .stat-card:nth-child(1), .stat-card:nth-child(6) { min-height:auto !important; }
-    .stat-card-label { margin-bottom:4px !important; }
-    .stat-card-subvalue { margin-top:4px !important; }
-    .overview-grid { gap:8px !important; margin-bottom:12px !important; }
-
-    /* ── TEAM OVERVIEW: horizontal strip ── */
-    .advanced-metric-grid { display:flex !important; gap:8px !important; flex-wrap:nowrap; }
-    .advanced-metric-grid > .stat-card { width:140px; flex:0 0 140px; padding:10px !important; min-height:auto !important; }
-    .stat-card .trend-sparkline { margin-top:4px !important; }
-    .stat-val-row { margin-top:4px !important; margin-bottom:6px !important; }
-    .percentile-bar-container { margin-bottom:6px !important; }
-    .vitals-strip { padding:10px !important; gap:10px !important; }
-    .context-pills-row { padding:10px !important; gap:10px !important; }
-
-    /* ── ADVANCED METRICS: 4×2 grid ── */
-    .advanced-metrics-grid { grid-template-columns: 1fr 1fr !important; gap:8px !important; }
-    .advanced-metrics-grid > .advanced-card { min-width:140px; padding:10px !important; }
-    .advanced-card .micro-bar-chart { margin-top:4px !important; }
-
-    /* ── LINEUP ── */
-    .player-avatar { width:32px !important; height:32px !important; font-size:11px !important; }
-    .lineup-combo-table tr { height:28px !important; }
-    .lineup-combo-table td, .lineup-combo-table th { padding:4px 8px !important; }
-    .lineup-combo { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; }
-    .lineup-grid { gap:8px !important; margin-bottom:10px !important; }
-    .lineup-card { padding:10px !important; gap:6px !important; }
-
-    /* ── RECENT GAMES: 26px rows ── */
-    .game-card { padding:4px 8px !important; min-height:26px !important; height:auto; gap:8px !important; border-radius:4px !important; }
-    .game-card .opp-logo { width:28px !important; height:28px !important; font-size:10px !important; }
-    .game-score { width:48px; text-align:right; display:inline-block; font-size:12px !important; }
-    .games-table { gap:4px !important; }
-    .recent-games-section { margin-top:12px !important; margin-bottom:12px !important; }
-    .section-title { margin-bottom:8px !important; font-size:12px !important; }
-
-    /* ── TABLE ROW HEIGHT ── */
-    table tr { height:28px; }
-    .roster-table td, .roster-table th { padding:6px 8px !important; }
-    .schedule-table td, .schedule-table th { padding:6px 8px !important; }
-
-    /* ── INSIGHT PANELS ── */
-    .team-insights-grid { gap:10px !important; margin-bottom:12px !important; padding-bottom:12px !important; }
-    .team-panel { padding:12px !important; }
-    .team-gauge { width:120px !important; height:72px !important; }
-    .team-gauge-value { font-size:22px !important; }
-    .team-form-trail { padding:6px 0 8px !important; min-height:auto !important; gap:6px !important; }
-    .team-form-dot { width:12px !important; height:12px !important; }
-    .team-form-foot { gap:8px !important; padding-top:8px !important; }
-    .team-form-foot-item { padding:8px !important; }
-    .team-form-foot-value { font-size:16px !important; }
-
-    /* ── PANEL HEADERS compact ── */
-    .panel-head { padding:8px 10px !important; gap:8px !important; }
-    .panel-title { font-size:13px !important; }
-
-    /* ── TEAM HEADER compact ── */
-    .team-header { margin-bottom:12px !important; }
-    .team-header-hero { padding:16px 20px !important; }
-    .team-header-abbr { font-size:36px !important; }
-    .team-header-name { font-size:16px !important; }
-    .record-value { font-size:32px !important; }
-    .stat-number { font-size:24px !important; }
-    .team-header-watermark { font-size:180px !important; }
-    .team-context-bar { margin:-4px 0 10px !important; }
-    .context-chip { padding:8px 10px !important; }
-    .context-value { font-size:14px !important; }
-
-    /* ── TABS compact ── */
-    .team-tabs { margin-bottom:10px !important; min-height:36px !important; }
-    .tab-button { padding:6px 12px !important; font-size:10px !important; }
-
-    /* ── TOOLTIPS (spec standard) ── */
-    .pm-tooltip { position:absolute; z-index:9999; background:#111400; border:1px solid #2a3000; padding:8px 12px; font-size:11px; color:#fff; pointer-events:none; border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,.6); max-width:280px; line-height:1.4; }
-    .pm-tooltip strong { color:var(--lime); display:block; margin-bottom:2px; }
-
-    /* ── TRANSITIONS ── */
-    .pm-anim { transition: all 180ms ease; }
-
-    /* ── COMPARE MODE OVERLAY ── */
-    .toggle-compare { font-family:var(--mono); font-size:9px; font-weight:700; letter-spacing:1px; padding:4px 10px; border:1px solid var(--border); color:var(--muted); text-transform:uppercase; transition:all .2s; }
-    .toggle-compare:hover { border-color:var(--coral); color:var(--coral); }
-    .toggle-compare.active { background:rgba(255,75,38,.15); border-color:var(--coral); color:var(--coral); box-shadow:0 0 8px rgba(255,75,38,.2); }
-    body.compare-mode .shot-zone { stroke:var(--coral) !important; stroke-dasharray:4,3; }
-    body.compare-mode #fourFactorsRadarWrap polygon:first-of-type { stroke:var(--coral) !important; fill:rgba(255,75,38,.08) !important; }
-
-    /* ── EFFICIENCY TOGGLE BUTTONS ── */
-    .toggle-mode, .toggle-playtype { font-family:var(--mono); font-size:9px; font-weight:700; letter-spacing:1px; padding:4px 10px; border:1px solid var(--border); color:var(--muted); text-transform:uppercase; cursor:pointer; transition:all .2s; }
-    .toggle-mode:hover, .toggle-playtype:hover { border-color:var(--lime); color:var(--lime); }
-    .toggle-mode.active, .toggle-playtype.active { background:var(--lime); color:#05050a; border-color:var(--lime); }
-
-    /* ── TIMELINE WINDOW PILLS ── */
-    .timeline-window-pills { display:flex; gap:2px; }
-    .timeline-window { font-family:var(--mono); font-size:9px; font-weight:700; padding:3px 8px; border:1px solid var(--border); color:var(--muted); cursor:pointer; transition:all .2s; background:transparent; }
-    .timeline-window:hover { border-color:var(--lime); color:var(--lime); }
-    .timeline-window.active { background:var(--lime); color:#05050a; border-color:var(--lime); }
-
-    /* ── PLAY TYPE ROW EXPANSION ── */
-    .play-type-card { transition: height .15s ease, background .15s; cursor:pointer; }
-    .play-type-card.expanded { height:56px !important; background:rgba(197,248,42,.04); }
-    .play-type-card .pt-spark { display:block; margin-top:4px; }
-
-    /* ── SORTABLE COLUMN HIGHLIGHT ── */
-    .play-types-header span { cursor:pointer; transition:color .15s; user-select:none; }
-    .play-types-header span:hover { color:var(--lime); }
-    .play-types-header span.sort-active { color:var(--lime); }
-
-    /* ── GAME CARD HIGHLIGHT & EXPAND ── */
-    .game-card.highlight { border-color:var(--lime) !important; background:rgba(197,248,42,.08) !important; box-shadow:0 0 8px rgba(197,248,42,.15); }
-    .game-card.expanded { height:auto !important; }
-    .game-quarter-bars { display:flex; gap:3px; align-items:flex-end; padding:4px 0 2px 40px; }
-    .game-quarter-bars > div { border-radius:2px; min-width:18px; }
-
-    /* ── LINEUP ROW INTERACTIONS ── */
-    .lineup-combo-table tbody tr { transition:background .15s, box-shadow .15s; cursor:pointer; }
-    .lineup-combo-table tbody tr:hover { background:rgba(197,248,42,.06) !important; }
-    .player-avatar.pulse-outline { animation:avatarPulse 1s ease forwards; }
-    @keyframes avatarPulse {
-      0% { box-shadow:0 0 0 0 rgba(197,248,42,.6); }
-      50% { box-shadow:0 0 0 6px rgba(197,248,42,.3); }
-      100% { box-shadow:0 0 0 0 rgba(197,248,42,0); }
-    }
-
-    /* ── ADVANCED CARD HOVER ── */
-    .advanced-card { transition:border-color .2s, background .2s; cursor:default; }
-    .advanced-card:hover { border-color:var(--lime) !important; }
-
-    /* ── ADV METRICS TABS ── */
-    .adv-window-pills { display:flex; gap:2px; margin-left:auto; }
-    .adv-window { font-family:var(--mono); font-size:9px; font-weight:700; padding:3px 8px; border:1px solid var(--border); color:var(--muted); cursor:pointer; transition:all .2s; background:transparent; }
-    .adv-window:hover { border-color:var(--lime); color:var(--lime); }
-    .adv-window.active { background:var(--lime); color:#05050a; border-color:var(--lime); }
-
-    /* ── W/L DOT IN RECENT GAMES ── */
-    .wl-dot { display:inline-block; width:8px; height:8px; border-radius:50%; cursor:pointer; }
-    .wl-dot.win { background:var(--lime); }
-    .wl-dot.loss { background:var(--coral); }
-
-    /* ── KEYBOARD SHORTCUT HINT ── */
-    .kb-hint { font-family:var(--mono); font-size:8px; color:var(--muted2); margin-left:4px; border:1px solid var(--border); padding:1px 4px; }
-  </style>
+  <!-- Compactness + interactivity styles consolidated into team.css -->
 
   <script src="../scripts/data.js" defer></script>
   <script src="../scripts/shared.js" defer></script>
@@ -272,7 +99,7 @@
     </div>
 
     <nav class="sidebar-nav" id="sideNav" style="position:relative">
-      <div id="navRail" aria-hidden="true"></div>
+
       <div class="nav-section">MAIN</div>
       <a class="nav-item" href="home.html">
         <svg class="lucide-icon" width="16" height="16"><use href="#icon-layout-dashboard" /></svg>
@@ -280,7 +107,7 @@
       </a>
       <a class="nav-item active" href="teams.html">
         <svg class="lucide-icon" width="16" height="16"><use href="#icon-users" /></svg>
-        Teams<span class="ni-badge">5</span>
+        Teams
       </a>
       <a class="nav-item" href="players.html">
         <svg class="lucide-icon" width="16" height="16"><use href="#icon-bar-chart-2" /></svg>
@@ -337,7 +164,6 @@
           <input type="search" id="globalSearch" placeholder="Search player, team..." aria-label="Search"
             oninput="handleGlobalSearch(this.value)" />
         </div>
-        <button class="toggle-compare icon-btn" id="compareToggle" title="Compare mode (C)">Compare</button>
         <button class="icon-btn" aria-label="Notifications"><svg class="lucide-icon" aria-hidden="true" width="16"
             height="16" style="width:16px;height:16px">
             <use href="#icon-bell" />
@@ -356,6 +182,9 @@
       </div>
 
       <div class="team-context-bar" id="teamContextBar" aria-label="Team summary"></div>
+
+      <!-- Injury Ticker -->
+      <div class="injury-ticker" id="injuryTicker" style="display:none" aria-label="Injury report"></div>
 
       <!-- Tabs: Overview / Roster / Schedule -->
       <div class="team-tabs" id="teamTabs">
@@ -377,553 +206,44 @@
       <!-- Tab Content -->
       <div class="team-content">
         <!-- Overview Tab -->
-          <div class="tab-pane active" id="tab-overview">
-          <div class="analytics-toolbar" id="analyticsToolbar">
-            <label class="toolbar-group">
-              <span class="toolbar-label">Date Range</span>
-              <select id="dateRangeFilter" class="toolbar-select" aria-label="Date range filter">
-                <option value="10">Last 10 games</option>
-                <option value="15" selected>Last 15 games</option>
-                <option value="30">Last 30 games</option>
-              </select>
-            </label>
-            <label class="toolbar-group">
-              <span class="toolbar-label">Lineup Min</span>
-              <input id="lineupMinMinutes" class="toolbar-input" type="number" min="0" step="5" value="120" aria-label="Minimum lineup minutes" />
-            </label>
-          </div>
+        <div class="tab-pane active" id="tab-overview">
 
-          <div class="overview-grid">
-            <div class="stat-card">
-              <div class="stat-card-label">Record</div>
-              <div class="stat-card-value" id="recordValue">—</div>
-              <div class="stat-card-subvalue" id="recordSplitValue">—</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-card-label">Win %</div>
-              <div class="stat-card-value" id="winPctValue">—</div>
-              <div class="stat-card-subvalue" id="winPctRankValue">—</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-card-label">Net Rating</div>
-              <div class="stat-card-value stat-card-value--with-trend" id="netRatingValue">—</div>
-              <div class="stat-card-subvalue stat-trend" id="netRatingTrend">—</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-card-label">Last 10</div>
-              <div class="stat-card-value" id="lastTenValue">—</div>
-              <div class="l10-trail" id="lastTenTrail" aria-label="Recent game form trail"></div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-card-label">Seed</div>
-              <div class="stat-card-value" id="seedValue">—</div>
-              <div class="stat-card-subvalue" id="conferenceRankValue">—</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-card-label">Playoff Est.</div>
-              <div class="stat-card-value" id="playoffEstValue">—</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-card-label">Streak</div>
-              <div class="stat-card-value" id="streakValue">—</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-card-label">GB Median</div>
-              <div class="stat-card-value" id="gbValue">—</div>
-            </div>
-          </div>
+          <!-- SCOUT REPORT + FOUR FACTORS ROW -->
+          <div class="overview-insights-row pm-reveal" data-delay="1">
 
-          <!-- TEAM OVERVIEW -->
-          <div class="panel analytics-panel span-2 team-overview-section">
-            <div class="panel-head">
-              <span class="panel-title">
-                <span class="panel-title-icon"><svg class="lucide-icon" width="14" height="14"><use href="#icon-activity" /></svg></span>
-                Team Overview
-              </span>
-              <span class="panel-kicker">Identity, health, and core performance ratings</span>
-            </div>
-            <div class="lab-shell">
-              <!-- Vitals Strip -->
-              <div class="vitals-strip">
-                <div class="vital-col record-col">
-                  <div class="vital-label">Record</div>
-                  <div class="vital-primary"><span id="overviewRecord">52-30</span> <span class="vital-badge" id="overviewStreak">W5</span></div>
-                  <div class="season-health-timeline" id="overviewHealthTimeline"></div>
-                </div>
-                <div class="vital-col next-game-col">
-                  <div class="vital-label">Next Game</div>
-                  <div class="next-game-card">
-                    <div class="next-game-logo" id="overviewNextLogo">LAL</div>
-                    <div class="next-game-info">
-                      <div class="next-game-date" id="overviewNextDate">Fri, 7:30p</div>
-                      <div class="next-game-loc" id="overviewNextLoc">HOME</div>
-                    </div>
-                  </div>
-                </div>
-                <div class="vital-col injury-col">
-                  <div class="vital-label">Injury Report</div>
-                  <div class="injury-list" id="overviewInjuries">
-                    <!-- Populated via JS -->
-                  </div>
-                </div>
+            <!-- Scout Report -->
+            <div class="panel scout-report-panel" id="scoutReportPanel">
+              <div class="panel-head">
+                <span class="panel-title">
+                  <span class="panel-title-icon"><svg class="lucide-icon" width="14" height="14"><use href="#icon-zap"/></svg></span>
+                  Scout Report
+                </span>
+                <span class="panel-badge-outlined" id="scoutBadge">AI GENERATED</span>
               </div>
+              <div class="scout-body" id="scoutBody">
+                <div class="skeleton-line" style="width:90%;margin-bottom:8px"></div>
+                <div class="skeleton-line" style="width:75%;margin-bottom:8px"></div>
+                <div class="skeleton-line" style="width:82%"></div>
+              </div>
+              <div class="scout-tags" id="scoutTags"></div>
+            </div>
 
-              <!-- Context Pills Row -->
-              <div class="context-pills-row">
-                <div class="playoff-gauge-container">
-                  <div class="vital-label">Playoff Prob</div>
-                  <div class="playoff-gauge-wrap">
-                    <svg viewBox="0 0 100 50" class="playoff-gauge-svg">
-                      <path class="gauge-bg" d="M 10 45 A 40 40 0 0 1 90 45" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8" stroke-linecap="round"/>
-                      <path class="gauge-fill" id="overviewPlayoffArc" d="M 10 45 A 40 40 0 0 1 90 45" fill="none" stroke="url(#playoffGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="125.6" stroke-dashoffset="125.6"/>
-                      <defs>
-                        <linearGradient id="playoffGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stop-color="var(--coral)" />
-                          <stop offset="50%" stop-color="var(--amber)" />
-                          <stop offset="100%" stop-color="var(--lime)" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <div class="gauge-value" id="overviewPlayoffProb">94%</div>
-                  </div>
-                </div>
-                <div class="context-pill-group">
-                  <div class="vital-label">ATS Record</div>
-                  <div class="context-pill">
-                    <span id="overviewATS">--</span>
-                    <div class="mini-win-bar"><div class="mini-win-fill" id="overviewATSBar"></div></div>
-                  </div>
-                </div>
-                <div class="context-pill-group">
-                  <div class="vital-label">O/U Record</div>
-                  <div class="context-pill">
-                    <span id="overviewOU">--</span>
-                    <div class="mini-win-bar"><div class="mini-win-fill" id="overviewOUBar"></div></div>
-                  </div>
-                </div>
-                <div class="context-pill-group">
-                  <div class="vital-label">Home / Away</div>
-                  <div class="context-pill">
-                    <span id="overviewHomeAway">--</span>
-                    <div class="mini-win-bar"><div class="mini-win-fill" id="overviewHomeAwayBar"></div></div>
-                  </div>
-                </div>
+            <!-- Four Factors -->
+            <div class="panel four-factors-panel" id="fourFactorsPanel">
+              <div class="panel-head">
+                <span class="panel-title">
+                  <span class="panel-title-icon"><svg class="lucide-icon" width="14" height="14"><use href="#icon-bar-chart-2"/></svg></span>
+                  Four Factors
+                </span>
+                <span class="panel-badge-outlined">OFFENSE VS LEAGUE AVG</span>
               </div>
+              <div class="four-factors-grid" id="fourFactorsGrid"></div>
+            </div>
 
-              <!-- Core Ratings (compact horizontal strip) -->
-              <div class="advanced-metric-grid">
-                <!-- Net Rating -->
-                <div class="stat-card">
-                  <div class="stat-card-label">Net Rating</div>
-                  <div class="stat-val-row">
-                    <div class="stat-card-value" id="overviewNet">--</div>
-                    <div class="delta-chip lime" id="overviewNetDelta">--</div>
-                  </div>
-                  <div class="percentile-bar-container">
-                    <div class="percentile-bar"><div class="percentile-fill lime" id="overviewNetPctBar"></div><div class="percentile-dot lime"></div></div>
-                    <div class="percentile-label" id="overviewNetPctLabel">--</div>
-                  </div>
-                  <svg class="trend-sparkline" id="overviewNetSpark" viewBox="0 0 80 24" aria-hidden="true"></svg>
-                </div>
-                <!-- Off Rating -->
-                <div class="stat-card">
-                  <div class="stat-card-label">Off Rating</div>
-                  <div class="stat-val-row">
-                    <div class="stat-card-value" id="overviewOff">--</div>
-                    <div class="delta-chip teal" id="overviewOffDelta">--</div>
-                  </div>
-                  <div class="percentile-bar-container">
-                    <div class="percentile-bar"><div class="percentile-fill teal" id="overviewOffPctBar"></div><div class="percentile-dot teal"></div></div>
-                    <div class="percentile-label" id="overviewOffPctLabel">--</div>
-                  </div>
-                  <svg class="trend-sparkline" id="overviewOffSpark" viewBox="0 0 80 24" aria-hidden="true"></svg>
-                </div>
-                <!-- Def Rating -->
-                <div class="stat-card">
-                  <div class="stat-card-label">Def Rating</div>
-                  <div class="stat-val-row">
-                    <div class="stat-card-value" id="overviewDef">--</div>
-                    <div class="delta-chip coral" id="overviewDefDelta">--</div>
-                  </div>
-                  <div class="percentile-bar-container">
-                    <div class="percentile-bar"><div class="percentile-fill coral" id="overviewDefPctBar"></div><div class="percentile-dot coral"></div></div>
-                    <div class="percentile-label" id="overviewDefPctLabel">--</div>
-                  </div>
-                  <svg class="trend-sparkline" id="overviewDefSpark" viewBox="0 0 80 24" aria-hidden="true"></svg>
-                </div>
-                <!-- Pace -->
-                <div class="stat-card">
-                  <div class="stat-card-label">Pace</div>
-                  <div class="stat-val-row">
-                    <div class="stat-card-value" id="overviewPace">--</div>
-                    <div class="delta-chip lime" id="overviewPaceDelta">--</div>
-                  </div>
-                  <div class="pace-strip-container">
-                    <div class="pace-strip"></div>
-                    <div class="pace-tick" id="overviewPaceTick"></div>
-                  </div>
-                  <div class="percentile-label" id="overviewPacePctLabel" style="margin-top: 4px;">--</div>
-                    <svg class="trend-sparkline" id="overviewPaceSpark" viewBox="0 0 80 24" aria-hidden="true"></svg>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          <!-- RATING TIMELINE -->
-          <div class="panel analytics-panel span-2 rating-timeline-section">
-            <div class="panel-head" style="justify-content:space-between">
-              <span class="panel-title">
-                <span class="panel-title-icon"><svg class="lucide-icon" width="14" height="14"><use href="#icon-activity" /></svg></span>
-                Rating Timeline
-              </span>
-              <div style="display:flex;align-items:center;gap:12px">
-                <span class="panel-kicker">Season-long performance trends and key events</span>
-                <div class="timeline-window-pills">
-                  <button class="timeline-window pm-anim" data-window="5">L5</button>
-                  <button class="timeline-window pm-anim" data-window="10">L10</button>
-                  <button class="timeline-window pm-anim" data-window="20">L20</button>
-                  <button class="timeline-window pm-anim active" data-window="season">Season</button>
-                </div>
-                <div class="timeline-toggles pm-anim" style="margin-left:8px">
-                  <button class="timeline-toggle active" data-metric="net">Net</button>
-                  <button class="timeline-toggle" data-metric="off">Off</button>
-                  <button class="timeline-toggle" data-metric="def">Def</button>
-                </div>
-              </div>
-            </div>
-            <div class="lab-shell">
-            <div class="timeline-chart-container">
-              <div style="position:relative;">
-                <canvas id="ratingTimelineChart"></canvas>
-                <div id="timelineScrubber" style="position:absolute;left:0;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.08);pointer-events:none;display:none;z-index:9"></div>
-              </div>
-            </div>
-            </div>
-          </div>
-
-          <!-- EFFICIENCY BREAKDOWN -->
-          <div class="panel analytics-panel span-2 efficiency-breakdown-section">
-            <div class="panel-head">
-              <span class="panel-title">
-                <span class="panel-title-icon"><svg class="lucide-icon" width="14" height="14"><use href="#icon-activity" /></svg></span>
-                Efficiency Breakdown
-              </span>
-              <span class="panel-kicker">Court Heatmap & Four Factors Radar</span>
-              <div style="display:flex;gap:8px;align-items:center">
-                <button class="toggle-mode pm-anim" data-mode="off">OFFENSE</button>
-                <button class="toggle-mode pm-anim" data-mode="def">DEFENSE</button>
-              </div>
-            </div>
-            <div class="lab-shell">
-              <div class="efficiency-grid">
-                <!-- Court Heatmap -->
-                <div class="heatmap-col">
-                  <div class="chart-head">
-                    <div>
-                      <div class="chart-title">Shot Profile</div>
-                      <div class="chart-sub">Density & Quality by Zone</div>
-                    </div>
-                  </div>
-                  <div class="court-svg-wrap">
-                    <svg viewBox="0 0 500 470" id="courtHeatmapSvg" preserveAspectRatio="xMidYMin meet">
-                      <!-- Court lines -->
-                      <path d="M 0 0 L 500 0 L 500 470 L 0 470 Z" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
-                      <path d="M 0 140 L 40 140 L 40 0 L 0 0" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
-                      <path d="M 500 140 L 460 140 L 460 0 L 500 0" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
-                      <path d="M 170 0 L 170 190 L 330 190 L 330 0" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
-                      <path d="M 40 0 C 40 220, 460 220, 460 0" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
-                      <circle cx="250" cy="53" r="15" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
-                      <line x1="220" y1="40" x2="280" y2="40" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
-                      
-                      <!-- Zones (Clickable/Hoverable) -->
-                      <path id="zone-paint" d="M 170 0 L 170 190 L 330 190 L 330 0 Z" fill="var(--lime)" fill-opacity="0.2" stroke="var(--lime)" stroke-width="2" class="shot-zone" data-zone="paint"/>
-                      <path id="zone-mid" d="M 40 0 L 170 0 L 170 190 L 330 190 L 330 0 L 460 0 C 460 220, 40 220, 40 0" fill="var(--lime)" fill-opacity="0.1" stroke="var(--lime)" stroke-width="2" class="shot-zone"/>
-                      <path id="zone-left3" d="M 0 0 L 40 0 L 40 140 L 0 140 Z" fill="var(--coral)" fill-opacity="0.2" stroke="var(--coral)" stroke-width="2" class="shot-zone" data-zone="left3"/>
-                      <path id="zone-right3" d="M 460 0 L 500 0 L 500 140 L 460 140 Z" fill="var(--lime)" fill-opacity="0.3" stroke="var(--lime)" stroke-width="2" class="shot-zone" data-zone="right3"/>
-                      <path id="zone-top3" d="M 0 140 L 40 140 C 40 220, 460 220, 460 140 L 500 140 L 500 470 L 0 470 Z" fill="var(--coral)" fill-opacity="0.1" stroke="var(--coral)" stroke-width="2" class="shot-zone" data-zone="top3"/>
-                    </svg>
-                  </div>
-                </div>
-
-                <!-- Four Factors Radar -->
-                <div class="radar-col">
-                  <div class="chart-head">
-                    <div>
-                      <div class="chart-title">Four Factors Radar</div>
-                      <div class="chart-sub">Team vs League Average</div>
-                    </div>
-                  </div>
-                  <div class="radar-svg-wrap" id="fourFactorsRadarWrap">
-                    <!-- SVG populated by JS (max 160x160 enforced via inline CSS) -->
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- PLAY TYPE BREAKDOWN -->
-          <div class="panel analytics-panel span-2 play-types-section">
-            <div class="panel-head">
-              <span class="panel-title">
-                <span class="panel-title-icon"><svg class="lucide-icon" width="14" height="14"><use href="#icon-activity" /></svg></span>
-                Play Type Breakdown
-              </span>
-              <span class="panel-kicker">Frequency vs. PPP (Points Per Possession)</span>
-              <div style="display:flex;gap:8px;align-items:center">
-                <button class="toggle-playtype pm-anim" data-side="off">OFF</button>
-                <button class="toggle-playtype pm-anim" data-side="def">DEF</button>
-              </div>
-            </div>
-            <div class="lab-shell">
-              <div class="efficiency-grid">
-                <!-- Left: Table -->
-                <div class="heatmap-col" style="justify-content: flex-start;">
-                  <div class="chart-head" style="margin-bottom: 8px;">
-                    <div>
-                      <div class="chart-title">Play Type Efficiency</div>
-                      <div class="chart-sub">Frequency vs PPP</div>
-                    </div>
-                  </div>
-                  <div class="play-types-header">
-                    <span>Play Type</span>
-                    <span>Freq</span>
-                    <span style="text-align:right">PPP</span>
-                    <span style="text-align:right">vs Lg</span>
-                  </div>
-                  <div class="play-types-grid" id="playTypesGrid" style="gap: 8px;">
-                    <!-- Populated by team.js -->
-                  </div>
-                </div>
-
-                <!-- Right: Scatter Plot -->
-                <div class="radar-col">
-                  <div class="chart-head">
-                    <div>
-                      <div class="chart-title">Play Type Scatter</div>
-                      <div class="chart-sub">Freq (x) vs PPP (y)</div>
-                    </div>
-                  </div>
-                  <div class="scatter-svg-wrap" style="position:relative; width:100%;" id="playTypeScatterWrap">
-                    <!-- Populated by team.js -->
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- LINEUP & ROTATION DATA -->
-          <div class="panel analytics-panel span-2 lineup-section">
-            <div class="panel-head">
-              <span class="panel-title">
-                <span class="panel-title-icon"><svg class="lucide-icon" width="14" height="14"><use href="#icon-activity" /></svg></span>
-                Lineup & Rotation Data
-              </span>
-              <span class="panel-kicker">Best lineups, starters vs bench, on/off splits</span>
-            </div>
-            <div class="lab-shell">
-            <div class="lineup-grid">
-              <div class="lineup-card">
-                <div class="lineup-label">Best 5-Man Lineup</div>
-                <div class="avatar-row" aria-hidden="true">
-                  <div class="player-avatar" title="Player A">A</div>
-                  <div class="player-avatar" title="Player B">B</div>
-                  <div class="player-avatar" title="Player C">C</div>
-                  <div class="player-avatar" title="Player D">D</div>
-                  <div class="player-avatar" title="Player E">E</div>
-                </div>
-                <div class="lineup-combo" id="bestLineupCombo">OG + SGA + Brunson + IH + Embiid</div>
-                <div class="lineup-stat">
-                  <span class="stat-label">Net Rtg (120 min)</span>
-                  <span class="stat-value" id="bestLineupNetRtg">+18.4</span>
-                </div>
-              </div>
-              <div class="lineup-card">
-                <div class="lineup-label">Worst 5-Man Lineup</div>
-                <div class="avatar-row" aria-hidden="true">
-                  <div class="player-avatar" title="Bench A">BA</div>
-                  <div class="player-avatar" title="Bench B">BB</div>
-                  <div class="player-avatar" title="Bench C">BC</div>
-                </div>
-                <div class="lineup-combo" id="worstLineupCombo">Bench units</div>
-                <div class="lineup-stat">
-                  <span class="stat-label">Net Rtg (80 min)</span>
-                  <span class="stat-value" id="worstLineupNetRtg">−11.2</span>
-                </div>
-              </div>
-              <div class="lineup-card">
-                <div class="lineup-label">Starters vs. Bench</div>
-                <div class="lineup-split">
-                  <span>Starters: <strong id="startersNetRtg">+9.1</strong></span>
-                  <span>Bench: <strong id="benchNetRtg">+5.2</strong></span>
-                </div>
-              </div>
-            </div>
-            <div class="lineup-table-container">
-              <h4 class="table-title">Two-Man & Three-Man Combos (Starters Only)</h4>
-              <table class="lineup-combo-table" id="combosTable">
-                <thead>
-                  <tr>
-                    <th class="sortable-header" data-sort="players">Players</th>
-                    <th class="center sortable-header" data-sort="min">Min</th>
-                    <th class="center sortable-header" data-sort="netRtg">Net Rtg</th>
-                    <th class="center sortable-header" data-sort="ppp">PPP</th>
-                  </tr>
-                </thead>
-                <tbody id="combosTableBody">
-                  <!-- Populated by team.js -->
-                </tbody>
-              </table>
-            </div>
-            </div>
-          </div>
-
-          <!-- ADVANCED / CONTEXTUAL METRICS -->
-          <div class="panel analytics-panel span-2 advanced-section">
-            <div class="panel-head" style="justify-content:space-between">
-              <span class="panel-title">
-                <span class="panel-title-icon"><svg class="lucide-icon" width="14" height="14"><use href="#icon-activity" /></svg></span>
-                Advanced & Contextual Metrics
-              </span>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span class="panel-kicker">The differentiators: clutch performance, health adjustments, trajectory</span>
-                <div class="adv-window-pills">
-                  <button class="adv-window pm-anim" data-adv-window="10">LAST 10</button>
-                  <button class="adv-window pm-anim" data-adv-window="20">LAST 20</button>
-                  <button class="adv-window pm-anim active" data-adv-window="season">SEASON</button>
-                </div>
-              </div>
-            </div>
-            <div class="lab-shell">
-              <div class="efficiency-grid">
-                <!-- Left: Octagonal Radar -->
-                <div class="radar-col">
-                  <div class="chart-head">
-                    <div>
-                      <div class="chart-title">Team DNA Radar</div>
-                      <div class="chart-sub">8-Axis Performance Shape</div>
-                    </div>
-                  </div>
-                  <div class="radar-svg-wrap" id="advancedRadarWrap">
-                    <!-- Populated by JS -->
-                  </div>
-                </div>
-
-                <!-- Right: Advanced Metric Cards -->
-                <div class="heatmap-col" style="justify-content: flex-start; padding: 0; background: transparent; border: none;">
-                  <div class="advanced-metrics-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div class="advanced-card">
-                      <div class="adv-label">Second Chance Pts</div>
-                      <div class="adv-value" id="advSecondChance">12.4</div>
-                      <div class="adv-detail" id="advSecondChanceDetail">Off rebounds converted</div>
-                      <svg class="micro-bar-chart" id="advSecondChanceSpark" viewBox="0 0 100 24"></svg>
-                    </div>
-                    <div class="advanced-card">
-                      <div class="adv-label">Clutch Net Rtg</div>
-                      <div class="adv-value" id="advClutchNetRtg">+4.3</div>
-                      <div class="adv-detail" id="advClutchDetail">Last 2 min, ±5 pts</div>
-                      <svg class="micro-bar-chart" id="advClutchSpark" viewBox="0 0 100 24"></svg>
-                    </div>
-                    <div class="advanced-card">
-                      <div class="adv-label">Usage Concentration</div>
-                      <div class="adv-value" id="advUsageConc">32.1%</div>
-                      <div class="adv-detail" id="advUsageConcDetail">Top 2 players</div>
-                      <svg class="micro-bar-chart" id="advUsageSpark" viewBox="0 0 100 24"></svg>
-                    </div>
-                    <div class="advanced-card">
-                      <div class="adv-label">Health-Adjusted Rtg</div>
-                      <div class="adv-value" id="advHealthAdj">+8.1</div>
-                      <div class="adv-detail" id="advHealthAdjDetail">w/ full roster</div>
-                      <svg class="micro-bar-chart" id="advHealthSpark" viewBox="0 0 100 24"></svg>
-                    </div>
-                    <div class="advanced-card">
-                      <div class="adv-label">15-Game Trajectory</div>
-                      <div class="adv-value" id="advTrajectory">↑ +0.8</div>
-                      <div class="adv-detail" id="advTrajectoryDetail">Improving</div>
-                      <svg class="trajectory-sparkline micro-bar-chart" id="advTrajectorySparkline" viewBox="0 0 100 24" aria-label="Trajectory sparkline"></svg>
-                    </div>
-                    <div class="advanced-card" id="openTradeSim" style="cursor: pointer;" aria-label="Open Trade Simulator">
-                      <div class="adv-label">Trade Impact</div>
-                      <div class="adv-value" id="advTrade">--</div>
-                      <div class="adv-detail">Simulate</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="trade-sim-modal" id="tradeSimModal" aria-hidden="true">
-            <div class="trade-sim-card" role="dialog" aria-modal="true" aria-labelledby="tradeSimTitle">
-              <div class="trade-sim-head">
-                <h4 id="tradeSimTitle">Trade Impact Simulator</h4>
-                <button class="trade-sim-close" id="closeTradeSim" aria-label="Close trade simulator">×</button>
-              </div>
-              <div class="trade-sim-body">
-                <label class="trade-field">
-                  <span>Outgoing Player</span>
-                  <select id="tradeOutPlayer"></select>
-                </label>
-                <label class="trade-field">
-                  <span>Incoming Impact Tier</span>
-                  <select id="tradeInTier">
-                    <option value="elite">Elite (+2.0)</option>
-                    <option value="starter" selected>Starter (+0.8)</option>
-                    <option value="rotation">Rotation (+0.2)</option>
-                  </select>
-                </label>
-              </div>
-              <div class="trade-sim-foot">
-                <div class="trade-impact-result">Projected Net Rating: <strong id="tradeImpactResult">—</strong></div>
-                <button class="adv-button" id="runTradeSim">Run Simulation</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="team-insights-grid">
-            <section class="team-panel team-gauge-panel">
-              <div class="panel-kicker">NET RATING CONTEXT</div>
-              <div class="team-gauge-row">
-                <div class="team-gauge" id="netRatingGauge" aria-hidden="true">
-                  <div class="team-gauge-arc"></div>
-                  <div class="team-gauge-fill" id="netRatingGaugeFill"></div>
-                  <div class="team-gauge-center">
-                    <div class="team-gauge-value" id="netRatingGaugeValue">—</div>
-                    <div class="team-gauge-caption">Season rating</div>
-                  </div>
-                </div>
-                <div class="team-gauge-copy">
-                  <div class="team-gauge-title" id="gaugeContextTitle">—</div>
-                  <div class="team-gauge-detail" id="gaugeContextDetail">—</div>
-                </div>
-              </div>
-            </section>
-
-            <section class="team-panel team-form-panel">
-              <div class="panel-kicker">FORM SNAPSHOT</div>
-              <div class="team-form-trail" id="formTrail"></div>
-              <div class="team-form-foot">
-                <div class="team-form-foot-item">
-                  <span class="team-form-foot-label">Home / Away</span>
-                  <span class="team-form-foot-value" id="homeAwaySplitValue">—</span>
-                </div>
-                <div class="team-form-foot-item">
-                  <span class="team-form-foot-label">Split edge</span>
-                  <span class="team-form-foot-value" id="splitEdgeValue">—</span>
-                </div>
-              </div>
-            </section>
-          </div>
-
-          <div class="recent-games-section">
-            <h2 class="section-title">Last 10 Games</h2>
-            <div class="games-table" id="recentGamesTable">
-              <!-- Populated by team.js -->
-            </div>
           </div>
 
           <!-- PLAYER ANALYTICS LAB -->
-          <div class="panel analytics-panel span-2" id="analyticsLab">
+          <div class="panel analytics-panel span-2 pm-reveal" data-delay="2" id="analyticsLab">
             <div class="panel-head">
               <span class="panel-title">
                 <span class="panel-title-icon"><svg class="lucide-icon" aria-hidden="true" width="16" height="16"
@@ -933,7 +253,7 @@
                 Player Analytics Lab
               </span>
               <div style="display:flex;align-items:center;gap:6px">
-                <span class="panel-kicker">SHOT CHARTS / RADAR / SPLITS</span>
+                <span class="panel-badge-outlined">SHOT CHARTS / RADAR / SPLITS</span>
                 <div class="panel-badge lime" id="analyticsFreshness">READY</div>
               </div>
             </div>
@@ -997,7 +317,6 @@
                       <div class="chart-title" id="winProbTitle">Win Probability</div>
                       <div class="chart-sub" id="winProbMeta">Possession swing model</div>
                     </div>
-                    <div class="live-indicator mini"><div class="live-dot"></div>LIVE</div>
                   </div>
                   <div class="winprob-wrap" id="winProbChartSvg"></div>
                 </section>
@@ -1008,7 +327,7 @@
           </div>
 
           <!-- LINEUP, MATCHUP & PROP LAB -->
-          <div class="panel lineup-lab-panel span-2" id="lineupLab">
+          <div class="panel lineup-lab-panel span-2 pm-reveal" data-delay="3" id="lineupLab">
             <div class="panel-head">
               <span class="panel-title">
                 <span class="panel-title-icon"><svg class="lucide-icon" aria-hidden="true" width="16" height="16"
@@ -1018,7 +337,7 @@
                 Lineup, Matchup &amp; Prop Lab
               </span>
               <div style="display:flex;align-items:center;gap:6px">
-                <span class="panel-kicker">5-MAN BUILDER / PROP FILTERS</span>
+                <span class="panel-badge-outlined">5-MAN BUILDER / PROP FILTERS</span>
                 <div class="panel-badge muted" id="lineupDataBadge">LOCAL MODEL</div>
               </div>
             </div>
@@ -1072,21 +391,39 @@
           </div>
           <div class="roster-table-container">
             <table class="roster-table" id="rosterTable">
-              <thead>
-                <tr>
-                  <th>Player</th>
-                  <th class="center">MIN</th>
-                  <th class="center roster-basic-col">PPG</th>
-                  <th class="center roster-basic-col">RPG</th>
-                  <th class="center roster-basic-col">APG</th>
-                  <th class="center roster-basic-col">+/−</th>
-                  <th class="center roster-basic-col">Form</th>
-                  <!-- Advanced Columns -->
-                  <th class="center roster-advanced-col" title="Usage Percentage">USG%</th>
-                  <th class="center roster-advanced-col" title="True Shooting Percentage">TS%</th>
-                  <th class="center roster-advanced-col" title="Offensive Rebound Percentage">ORB%</th>
-                  <th class="center roster-advanced-col" title="Assist Percentage">AST%</th>
-                  <th class="center roster-advanced-col" title="Estimated Plus-Minus">EPM</th>
+              <thead class="roster-high-density-thead">
+                <tr class="roster-category-row">
+                  <th colspan="2"></th>
+                  <th colspan="1" class="center">ROLE</th>
+                  <th colspan="3" class="center">ESTIMATED +/-</th>
+                  <th colspan="2" class="center">SCORING</th>
+                  <th colspan="4" class="center">LOCATION</th>
+                  <th colspan="2" class="center">FREE THROWS</th>
+                  <th colspan="2" class="center">REBOUNDS</th>
+                  <th colspan="2" class="center">HANDLE</th>
+                  <th colspan="2" class="center">DEFENSE</th>
+                </tr>
+                <tr class="roster-metric-row">
+                  <th class="left pl-4">Player</th>
+                  <th class="center">MPG</th>
+                  <th class="center">USG</th>
+                  <th class="center">OFF</th>
+                  <th class="center">DEF</th>
+                  <th class="center">EPM</th>
+                  <th class="center">PTS</th>
+                  <th class="center">TS%</th>
+                  <th class="center">2PA</th>
+                  <th class="center">2P%</th>
+                  <th class="center">3PA</th>
+                  <th class="center">3P%</th>
+                  <th class="center">FTA</th>
+                  <th class="center">FT%</th>
+                  <th class="center">ORB</th>
+                  <th class="center">DRB</th>
+                  <th class="center">AST</th>
+                  <th class="center">TOV</th>
+                  <th class="center">STL</th>
+                  <th class="center">BLK</th>
                 </tr>
               </thead>
               <tbody id="rosterTableBody">
@@ -1098,49 +435,35 @@
 
         <!-- Schedule Tab -->
         <div class="tab-pane" id="tab-schedule">
-          <!-- Recent Results -->
-          <div class="schedule-section">
-            <h3 class="schedule-section-title">
-              <svg class="lucide-icon" width="14" height="14"><use href="#icon-activity"/></svg>
-              Recent Results
-            </h3>
-            <div class="schedule-table-container">
-              <table class="schedule-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Opponent</th>
-                    <th class="center">Score</th>
-                    <th class="center">Result</th>
-                  </tr>
-                </thead>
-                <tbody id="recentResultsBody">
-                  <!-- Populated by team.js -->
-                </tbody>
-              </table>
-            </div>
+          <!-- Record Summary Strip -->
+          <div class="sched-record-strip" id="schedRecordStrip">
+            <!-- Populated by team.js -->
           </div>
 
-          <!-- Upcoming Games -->
-          <div class="schedule-section">
-            <h3 class="schedule-section-title">
-              <svg class="lucide-icon" width="14" height="14"><use href="#icon-calendar"/></svg>
-              Upcoming Games
-            </h3>
-            <div id="matchupHeroContainer"></div>
-            <div class="schedule-table-container">
-              <table class="schedule-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Opponent</th>
-                    <th class="center" style="min-width:160px">Win Probability</th>
-                  </tr>
-                </thead>
-                <tbody id="scheduleTableBody">
-                  <!-- Populated by team.js -->
-                </tbody>
-              </table>
+          <!-- Two-column layout -->
+          <div class="sched-columns">
+            <!-- LEFT: Recent Results -->
+            <div class="sched-col">
+              <div class="sched-col-head">
+                <svg class="lucide-icon" width="12" height="12"><use href="#icon-activity"/></svg>
+                <span>Recent Results</span>
+                <span class="sched-streak-inline" id="schedStreakBadge"></span>
+              </div>
+              <div class="sched-games-list" id="recentGamesList">
+                <!-- Populated by team.js -->
+              </div>
+            </div>
+
+            <!-- RIGHT: Upcoming Games -->
+            <div class="sched-col">
+              <div class="sched-col-head">
+                <svg class="lucide-icon" width="12" height="12"><use href="#icon-calendar"/></svg>
+                <span>Upcoming Games</span>
+              </div>
+              <div id="matchupHeroContainer"></div>
+              <div class="upcoming-cards-grid" id="upcomingGamesCards">
+                <!-- Populated by team.js -->
+              </div>
             </div>
           </div>
         </div>
@@ -1189,6 +512,38 @@
 
   <!-- Compact interactivity: loaded as external module -->
   <script src="../scripts/team-interact.js"></script>
+
+  <!-- Scroll-reveal IntersectionObserver -->
+  <script>
+    (function() {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.querySelectorAll('.pm-reveal, .pm-reveal-left').forEach(el => {
+          el.classList.add('pm-visible');
+        });
+        return;
+      }
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('pm-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+      document.querySelectorAll('.pm-reveal, .pm-reveal-left').forEach(el => {
+        observer.observe(el);
+      });
+
+      // Mouse-tracking for stat strip radial hover
+      document.querySelectorAll('.ss-card').forEach(card => {
+        card.addEventListener('mousemove', e => {
+          const r = card.getBoundingClientRect();
+          card.style.setProperty('--mouse-x', ((e.clientX - r.left) / r.width * 100) + '%');
+          card.style.setProperty('--mouse-y', ((e.clientY - r.top) / r.height * 100) + '%');
+        });
+      });
+    })();
+  </script>
 
 </body>
 

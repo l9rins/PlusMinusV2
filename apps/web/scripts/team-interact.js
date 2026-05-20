@@ -25,18 +25,6 @@
   }
   function hideTip(){ if(pmTip) pmTip.style.display='none'; }
 
-  /* ═══ COMPARE MODE ═══ */
-  const compareBtn=document.getElementById('compareToggle');
-  if(compareBtn){
-    function toggleCompare(){
-      const on=document.body.classList.toggle('compare-mode');
-      compareBtn.classList.toggle('active',on);
-      document.dispatchEvent(new CustomEvent('compare:toggle',{detail:{on}}));
-    }
-    compareBtn.addEventListener('click', toggleCompare);
-    document.addEventListener('keydown', e=>{ if(e.key.toLowerCase()==='c' && !e.ctrlKey && !e.metaKey && e.target.tagName!=='INPUT' && e.target.tagName!=='SELECT') toggleCompare(); });
-  }
-
   /* ═══ TIMELINE METRIC TOGGLE (T key + buttons) ═══ */
   const metricBtns=Array.from(document.querySelectorAll('.timeline-toggle'));
   const metricCycle=['net','off','def'];
@@ -75,10 +63,19 @@
           const label=chart.data.labels?chart.data.labels[pt.index]:'';
           const val=chart.data.datasets[pt.datasetIndex]?.data?.[pt.index]??'';
           const vStr=typeof val==='number'?val.toFixed(1):val;
-          const opp=['LAL','BOS','MIA','GSW','PHX','DEN','MIL','NYK','CLE','DAL'][pt.index%10]||'OPP';
-          const wl=Math.random()>0.4?'W':'L';
-          const score=`${95+Math.floor(Math.random()*25)}-${90+Math.floor(Math.random()*25)}`;
-          showTip(`<strong>${label}</strong><div style="margin-top:4px">vs ${opp} · ${wl} · ${score}</div><div>Net Rating: ${vStr}</div>`,ev.pageX,ev.pageY);
+          let opp = 'OPP', wl = '-', score = '0-0';
+          if (window._TIMELINE_GAMES && window._TIMELINE_GAMES[pt.index]) {
+            const game = window._TIMELINE_GAMES[pt.index];
+            const isHome = game.home === window.TEAM_ABBR;
+            opp = isHome ? game.away : game.home;
+            const ourScore = isHome ? game.homeScore : game.awayScore;
+            const oppScore = isHome ? game.awayScore : game.homeScore;
+            if (ourScore && oppScore) {
+              wl = Number(ourScore) > Number(oppScore) ? 'W' : 'L';
+              score = `${ourScore}-${oppScore}`;
+            }
+          }
+          showTip(`<strong>${label}</strong><div style="margin-top:4px">vs ${opp} · ${wl} · ${score}</div><div>Rating: ${vStr}</div>`,ev.pageX,ev.pageY);
         }
       }
     });
@@ -190,13 +187,12 @@
       const expanded=row.classList.toggle('expanded');
       if(expanded){
         row.style.height='56px';
-        if(!row.querySelector('.pt-spark')){
-          const s=document.createElement('svg'); s.className='pt-spark'; s.setAttribute('width','80'); s.setAttribute('height','24');
-          const pts=Array.from({length:10},(_,i)=>`${i*9},${4+Math.floor(Math.random()*16)}`).join(' ');
-          s.innerHTML=`<polyline points="${pts}" fill="none" stroke="var(--lime)" stroke-width="1.5"/>`;
-          s.style.marginLeft='auto'; s.style.marginTop='2px';
-          row.appendChild(s);
-        }
+        const s=document.createElement('svg'); s.className='pt-spark'; s.setAttribute('width','80'); s.setAttribute('height','24');
+        // Use real data attribute if available, else static
+        const sparkData = row.dataset.spark || "0,15 9,12 18,10 27,18 36,14 45,8 54,6 63,10 72,4 81,12";
+        s.innerHTML=`<polyline points="${sparkData}" fill="none" stroke="var(--lime)" stroke-width="1.5"/>`;
+        s.style.marginLeft='auto'; s.style.marginTop='2px';
+        row.appendChild(s);
       } else {
         row.style.height=''; const sp=row.querySelector('.pt-spark'); if(sp) sp.remove();
       }
@@ -210,9 +206,9 @@
       const c=ev.target;
       if(c.tagName==='circle'){
         const name=c.dataset.name||c.querySelector('title')?.textContent?.split(':')[0]||'Play';
-        const freq=c.dataset.freq||(5+Math.random()*20).toFixed(0);
-        const ppp=c.dataset.ppp||(0.9+Math.random()*0.5).toFixed(2);
-        const rank=c.dataset.rank||Math.floor(1+Math.random()*30);
+        const freq=c.dataset.freq||'0';
+        const ppp=c.dataset.ppp||'0.00';
+        const rank=c.dataset.rank||'-';
         showTip(`<strong>${name}</strong><div>Freq: ${freq}% · PPP: ${ppp} · Rank: ${rank}/30</div>`,ev.pageX,ev.pageY);
       }
     });
@@ -230,7 +226,11 @@
         // Reorder play type cards with animation
         if(playGrid){
           const cards=Array.from(playGrid.querySelectorAll('.play-type-card'));
-          cards.sort(()=>Math.random()-0.5); // Shuffle for demo
+          cards.sort((a,b) => {
+            const freqA = parseFloat(a.querySelector('.pt-bar-label')?.textContent) || 0;
+            const freqB = parseFloat(b.querySelector('.pt-bar-label')?.textContent) || 0;
+            return freqB - freqA;
+          });
           cards.forEach((card,j)=>{
             card.style.transition='transform 150ms ease, opacity 150ms ease';
             card.style.opacity='0'; card.style.transform='translateY(4px)';
@@ -282,10 +282,11 @@
   document.querySelectorAll('.player-avatar').forEach(av=>{
     av.addEventListener('mouseenter', e=>{
       const name=av.title||av.textContent||'Player';
-      const pos=['PG','SG','SF','PF','C'][Math.floor(Math.random()*5)];
-      const mpg=(20+Math.random()*16).toFixed(1);
-      const pm=(Math.random()*10-3).toFixed(1);
-      showTip(`<strong>${name}</strong><div>${pos} · ${mpg} MPG · ${pm>0?'+':''}${pm} +/-</div>`,e.pageX,e.pageY);
+      const tr=av.closest('tr');
+      const pos=tr.dataset.pos||'Mix';
+      const mpg=tr.dataset.mpg||'0.0';
+      const pm=tr.dataset.pm||'0.0';
+      showTip(`<strong>${name}</strong><div>Pos: ${pos} · Min/g: ${mpg}</div><div>Net: ${pm>0?'+':''}${pm}</div>`,e.pageX,e.pageY);
     });
     av.addEventListener('mouseleave', hideTip);
   });
@@ -303,8 +304,8 @@
     card.addEventListener('mouseenter', e=>{
       const label=card.querySelector('.adv-label')?.textContent||'Metric';
       const desc=metricDescs[label]||'Advanced performance metric.';
-      const rank=Math.floor(1+Math.random()*30);
-      const delta=(Math.random()*4-2).toFixed(1);
+      const rank=card.dataset.rank||'-';
+      const delta=card.dataset.delta||'0.0';
       showTip(`<strong>${label}</strong><div style="margin:4px 0">${desc}</div><div>Rank: ${rank}/30 · Δ vs last season: ${delta>0?'+':''}${delta}</div>`,e.pageX,e.pageY);
     });
     card.addEventListener('mouseleave', hideTip);
@@ -320,9 +321,8 @@
         spark.style.transition='opacity 200ms ease';
         spark.style.opacity='0.3';
         setTimeout(()=>{
-          const bars=Array.from({length:10},(_,i)=>{
-            const h=Math.random()*20+4;
-            const color=Math.random()>0.2?'var(--lime)':'var(--coral)';
+          const bars=spark.dataset.vals?.split(',').map((h,i)=>{
+            const color=parseInt(h)>15?'var(--lime)':'var(--coral)';
             return `<rect x="${i*10}" y="${24-h}" width="6" height="${h}" fill="${color}" opacity="0.8"/>`;
           }).join('');
           spark.innerHTML=bars;
@@ -341,8 +341,8 @@
         const labels=["Clutch","Transition","2nd Chance","Paint Def","TOV%","Shot Qual","Reb%","Pace"];
         const idx=Array.from(advRadar.querySelectorAll('circle')).indexOf(ev.target);
         const label=labels[idx]||'Metric';
-        const val=(30+Math.random()*50).toFixed(1);
-        const pct=Math.floor(20+Math.random()*70);
+        const val=ev.target.dataset.val||'0.0';
+        const pct=ev.target.dataset.pct||'0';
         showTip(`<strong>${label}</strong><div>Value: ${val} · ${pct}th percentile</div>`,ev.pageX,ev.pageY);
       }
     });
@@ -358,11 +358,12 @@
       if(expanded){
         if(!card.querySelector('.game-quarter-bars')){
           const bars=document.createElement('div'); bars.className='game-quarter-bars';
+          const qData=card.dataset.quarters?.split(',')||['10','10','10','10'];
           ['Q1','Q2','Q3','Q4'].forEach((q,i)=>{
             const b=document.createElement('div');
-            const h=8+Math.floor(Math.random()*28);
+            const h=parseInt(qData[i]);
             b.style.cssText=`width:22px;height:${h}px;background:linear-gradient(180deg,var(--lime),var(--amber));border-radius:3px;position:relative;`;
-            b.title=`${q}: ${18+Math.floor(Math.random()*16)}`;
+            b.title=`${q}: ${h}`;
             const lbl=document.createElement('span');
             lbl.style.cssText='position:absolute;top:-14px;left:0;font-family:var(--mono);font-size:8px;color:var(--muted);width:22px;text-align:center;';
             lbl.textContent=q;
@@ -381,13 +382,10 @@
       const pill=ev.target.closest('.result-pill');
       if(pill){
         const card=pill.closest('.game-card');
-        const scoreEl=card?.querySelector('.game-score');
-        const dateEl=card?.querySelector('.game-date');
-        const oppEl=card?.querySelector('.game-opp');
-        const score=scoreEl?.textContent||'—';
-        const date=dateEl?.textContent||'';
-        const opp=oppEl?.textContent||'';
-        const keyPlayer=['Scored 32 pts','12 reb, 8 ast','28 pts, 5 stl','Triple-double'][Math.floor(Math.random()*4)];
+        const score=card?.dataset.score||'—';
+        const date=card?.dataset.date||'';
+        const opp=card?.dataset.opp||'';
+        const keyPlayer=card?.dataset.key||'';
         showTip(`<strong>${date}</strong><div>${opp} · ${score}</div><div style="margin-top:2px;color:var(--muted)">Key: ${keyPlayer}</div>`,ev.pageX,ev.pageY);
       }
     });
@@ -400,12 +398,14 @@
   const shotChart=document.getElementById('shotChartSvg');
   if(shotChart){
     shotChart.addEventListener('mouseover', ev=>{
-      if(ev.target.tagName==='circle'){
-        const dist=Math.floor(2+Math.random()*24);
-        const made=Math.random()>0.45?'Made':'Missed';
-        const qtr=['Q1','Q2','Q3','Q4'][Math.floor(Math.random()*4)];
-        const margin=Math.floor(Math.random()*20-10);
-        showTip(`<strong>Shot Detail</strong><div>${dist}ft · ${made} · ${qtr}</div><div>Score margin: ${margin>0?'+':''}${margin}</div>`,ev.pageX,ev.pageY);
+      const c=ev.target;
+      if(c.tagName==='circle'){
+        const isMake=c.getAttribute('fill')==='var(--lime)'||c.getAttribute('opacity')==='1';
+        const dist=c.dataset.dist||'15';
+        const made=isMake?'Made':'Missed';
+        const qtr=c.dataset.qtr||'Q2';
+        const margin=c.dataset.margin||'+2';
+        showTip(`<div>${dist}ft Jumper - <strong>${made}</strong></div><div style="margin-top:4px;font-size:11px;color:var(--muted)">${qtr} · Margin: ${margin}</div>`,ev.pageX,ev.pageY);
       }
     });
     shotChart.addEventListener('mouseout', hideTip);
@@ -417,7 +417,7 @@
     winProbChart.addEventListener('mousemove', ev=>{
       const rect=winProbChart.getBoundingClientRect();
       const pct=((ev.clientX-rect.left)/rect.width*100).toFixed(0);
-      const winPct=(35+Math.random()*40).toFixed(1);
+      const winPct=winProbChart.dataset.winPct || '50.0';
       showTip(`<strong>Possession ${pct}%</strong><div>Win Prob: ${winPct}%</div>`,ev.pageX,ev.pageY);
     });
     winProbChart.addEventListener('mouseleave', hideTip);

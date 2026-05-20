@@ -431,10 +431,10 @@ const LAB_STATE = {
   metricView: 'advanced',
   shotMode: 'makes',
   garbageFilter: false,
-  team: 'OKC',
+  team: (new URLSearchParams(window.location.search).get('team') || 'OKC').toUpperCase(),
   minutes: 28,
   restEdge: true,
-  selected: ['Shai Gilgeous-Alexander', 'Jalen Williams', 'Chet Holmgren', 'Luguentz Dort', 'Cason Wallace'],
+  selected: [],
   advancedData: null,
 };
 
@@ -474,6 +474,11 @@ function getLabPlayers() {
       existing.team = existing.team || p.team;
       byName.set(p.name, existing);
     });
+  });
+  // Ensure active team's roster is always available in dropdowns
+  const activeRoster = LAB_TEAM_ROSTERS[LAB_STATE.team] || [];
+  activeRoster.forEach(p => {
+    if (!byName.has(p.name)) byName.set(p.name, { ...p, team: LAB_STATE.team });
   });
   return [...byName.values()].map(p => ({
     ...p,
@@ -565,8 +570,8 @@ function renderAdvancedMetrics(profile) {
     ],
   };
   const cards = views[LAB_STATE.metricView] || views.advanced;
-  grid.innerHTML = cards.map(([label, value, note, cls]) => `
-    <div class="metric-tile ${cls}">
+  grid.innerHTML = cards.map(([label, value, note, cls], i) => `
+    <div class="metric-tile ${cls}" style="animation-delay:${i * 0.05}s">
       <div class="metric-label">${esc(label)}</div>
       <div class="metric-value">${esc(value)}</div>
       <svg class="metric-sparkline" viewBox="0 0 100 18" fill="none">
@@ -728,7 +733,6 @@ function renderWinProbability(profile) {
       <text x="24" y="22" class="winprob-label">WIN PROB</text>
       <text x="352" y="22" text-anchor="end" class="winprob-label">${Math.round(last)}%</text>
       <text x="24" y="212" class="winprob-label">Q1</text>
-      <text x="352" y="212" text-anchor="end" class="winprob-label">LIVE</text>
     </svg>`;
 }
 
@@ -814,12 +818,40 @@ function renderLineupSummary() {
   if (!el) return;
   const roster = currentRoster();
   const selected = roster.filter(p => LAB_STATE.selected.includes(p.name));
-  const impact = selected.reduce((sum, p) => sum + p.impact, 0);
-  const spacing = selected.filter(p => ['spacer', 'creator', 'wing', 'connector'].includes(p.role)).length;
-  const size = selected.filter(p => ['rim', 'big', 'screen', 'hub'].includes(p.role)).length;
-  const net = impact * .72 + spacing * .8 + size * .4 - Math.abs(5 - selected.length) * 1.5;
-  const ortg = 113 + net * .62;
-  const synergy = Math.max(42, Math.min(96, 56 + net * 3.1 + selected.length * 2));
+  
+  let net = 0;
+  let ortg = 113.0;
+  let synergy = 50;
+  
+  // Real data calc if available
+  const logs = LAB_STATE.advancedData?.logs || {};
+  let validPlayers = 0;
+  let sumPlusMinus = 0;
+  let sumTsPct = 0;
+
+  selected.forEach(p => {
+    // If real data from roster
+    if (p.plus_minus !== undefined) {
+      sumPlusMinus += Number(p.plus_minus) || 0;
+      sumTsPct += Number(p.tsPct) || 0;
+      validPlayers++;
+    }
+  });
+
+  if (validPlayers > 0) {
+    net = (sumPlusMinus / validPlayers) * 5; // Rough extrapolation to 5-man net
+    ortg = 100 + (sumTsPct / validPlayers) * 0.3; // Rough offensive approximation
+    synergy = Math.max(42, Math.min(96, 50 + net * 2));
+  } else {
+    // Fallback heuristic
+    const impact = selected.reduce((sum, p) => sum + p.impact, 0);
+    const spacing = selected.filter(p => ['spacer', 'creator', 'wing', 'connector'].includes(p.role)).length;
+    const size = selected.filter(p => ['rim', 'big', 'screen', 'hub'].includes(p.role)).length;
+    net = impact * .72 + spacing * .8 + size * .4 - Math.abs(5 - selected.length) * 1.5;
+    ortg = 113 + net * .62;
+    synergy = Math.max(42, Math.min(96, 56 + net * 3.1 + selected.length * 2));
+  }
+
   const stats = [['Players', `${selected.length}/5`], ['Net', _signed(net)], ['ORtg', ortg.toFixed(1)], ['Synergy', _pct(synergy)]];
   el.innerHTML = stats.map(([label, value]) => `<div class="summary-stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join('');
 }
@@ -832,9 +864,32 @@ function renderMatchupsAndPairs() {
   const selected = roster.filter(p => LAB_STATE.selected.includes(p.name));
   const defenders = selected.length ? selected : roster.slice(0, 5);
   matchup.innerHTML = defenders.slice(0, 5).map((p, i) => {
-    const tier = p.role === 'stopper' || p.role === 'rim' ? 'A' : p.impact > 4 ? 'B+' : 'B';
-    const pts = (22 - p.impact + i * .7).toFixed(1);
-    return `<div class="matchup-row"><div class="matchup-name">${esc(p.name)}</div><div class="tier-badge">TIER ${esc(tier)}</div><div class="matchup-pts">${pts} adj</div></div>`;
+    // Real Data Calc
+    let stl = Number(p.stl) || 0;
+    let blk = Number(p.blk) || 0;
+    let drb = Number(p.drb) || 0;
+    
+    // Attempt to pull from live logs if available
+    const pLogs = LAB_STATE.advancedData?.logs?.[p.name];
+    if (pLogs && pLogs.length > 0) {
+      let lStl = 0, lBlk = 0;
+      pLogs.forEach(g => {
+        lStl += Number(g.STL) || 0;
+        lBlk += Number(g.BLK) || 0;
+      });
+      stl = lStl / pLogs.length;
+      blk = lBlk / pLogs.length;
+    }
+    
+    const stocks = stl + blk;
+    let tier = stocks > 2.0 ? 'A' : stocks > 1.2 ? 'B+' : 'B';
+    // Fallback if no real data
+    if (!p.stl && !pLogs) {
+      tier = p.role === 'stopper' || p.role === 'rim' ? 'A' : p.impact > 4 ? 'B+' : 'B';
+    }
+    const val = stocks > 0 ? `${stocks.toFixed(1)} stk` : `${(22 - p.impact + i * .7).toFixed(1)} adj`;
+    
+    return `<div class="matchup-row"><div class="matchup-name">${esc(p.name)}</div><div class="tier-badge">TIER ${esc(tier)}</div><div class="matchup-pts">${val}</div></div>`;
   }).join('');
   const backendCombos = LAB_STATE.advancedData?.lineups?.combos;
   if (Array.isArray(backendCombos) && backendCombos.length) {
@@ -859,8 +914,27 @@ function renderPropCards() {
   const players = (selected.length ? selected : roster).slice(0, 3);
   const rest = LAB_STATE.restEdge ? 4 : -2;
   el.innerHTML = players.map(p => {
-    const recent = Math.round(52 + p.impact * 5 + rest + (LAB_STATE.minutes - 28) * .9);
-    return `<div class="prop-card"><b>${esc(p.name.split(' ').pop())}</b><span>${LAB_STATE.minutes}+ min / matchup ${recent > 70 ? 'green' : recent > 55 ? 'neutral' : 'red'}</span><div class="prop-meter"><div style="width:${Math.max(12, Math.min(94, recent))}%"></div></div></div>`;
+    const pLogs = LAB_STATE.advancedData?.logs?.[p.name];
+    let recent = 0;
+    let color = 'neutral';
+    
+    if (pLogs && pLogs.length > 0) {
+      // Real API Hit-Rate
+      const limit = Math.min(10, pLogs.length);
+      let hits = 0;
+      for (let i = 0; i < limit; i++) {
+        const minsPlayed = parseFloat(pLogs[i].MIN) || 0;
+        if (minsPlayed >= LAB_STATE.minutes) hits++;
+      }
+      recent = (hits / limit) * 100;
+      color = recent >= 60 ? 'green' : recent <= 40 ? 'red' : 'neutral';
+    } else {
+      // Fallback simulated prop
+      recent = Math.round(52 + p.impact * 5 + rest + (LAB_STATE.minutes - 28) * .9);
+      color = recent > 70 ? 'green' : recent > 55 ? 'neutral' : 'red';
+    }
+    
+    return `<div class="prop-card"><b>${esc(p.name.split(' ').pop())}</b><span>${LAB_STATE.minutes}+ min / matchup ${color}</span><div class="prop-meter"><div style="width:${Math.max(12, Math.min(94, recent))}%"></div></div></div>`;
   }).join('');
 }
 
@@ -898,6 +972,25 @@ async function gatherAdvancedContext() {
     if (typeof window.fetchAdvancedTeamContext !== 'function') throw new Error('Advanced fetcher unavailable');
     const data = await window.fetchAdvancedTeamContext(LAB_STATE.team);
     LAB_STATE.advancedData = data;
+    
+    // Fetch logs for the selected players
+    const roster = currentRoster();
+    const topPlayers = roster.filter(p => LAB_STATE.selected.includes(p.name)).slice(0, 5);
+    if (topPlayers.length === 0) topPlayers.push(...roster.slice(0, 5));
+    
+    const logs = await Promise.allSettled(
+      topPlayers.map(p => {
+        const id = p.personId;
+        return id ? window.workerFetch(`/api/playerlog?player_id=${id}`, 8000, 1) : Promise.resolve([]);
+      })
+    );
+    LAB_STATE.advancedData.logs = {};
+    topPlayers.forEach((p, i) => {
+      if (logs[i].status === 'fulfilled' && logs[i].value) {
+        const games = Array.isArray(logs[i].value) ? logs[i].value : (logs[i].value.games || []);
+        LAB_STATE.advancedData.logs[p.name] = games;
+      }
+    });
     if (badge) {
       badge.textContent = data.ok ? 'LIVE DATA' : 'LOCAL MODEL';
       badge.className = data.ok ? 'panel-badge lime' : 'panel-badge muted';
@@ -988,6 +1081,47 @@ function runNaturalSearch() {
 
 function initAnalyticsLab() {
   if (!document.getElementById('analyticsLab')) return;
+
+  // Sync lab team with page context
+  const pageTeam = (window.TEAM_ABBR || new URLSearchParams(window.location.search).get('team') || '').toUpperCase();
+  if (pageTeam) {
+    // If team isn't hardcoded but we have ROSTER_DATA on team.js, dynamically populate it
+    if (!LAB_TEAM_ROSTERS[pageTeam] && typeof ROSTER_DATA !== 'undefined' && typeof normalizeRosterPlayer !== 'undefined' && ROSTER_DATA.length) {
+      LAB_TEAM_ROSTERS[pageTeam] = ROSTER_DATA.map(p => {
+        const norm = normalizeRosterPlayer(p);
+        return {
+          name: norm.name,
+          personId: p.personId || p.player_id || p.id,
+          role: 'creator',
+          impact: (Number(norm.pts) || 0) / 4,
+          usage: 20,
+          stl: norm.stl,
+          blk: norm.blk,
+          orb: norm.orb,
+          drb: norm.drb,
+          plus_minus: norm.plus_minus,
+          tsPct: norm.tsPct
+        };
+      }).sort((a, b) => b.impact - a.impact);
+    }
+    
+    if (LAB_TEAM_ROSTERS[pageTeam]) {
+      LAB_STATE.team = pageTeam;
+      // Auto-select the team's top players for lineup lab
+      if (!LAB_STATE.selected.length) {
+        LAB_STATE.selected = LAB_TEAM_ROSTERS[pageTeam].slice(0, 5).map(p => p.name);
+      }
+      // Set player/compare to team players if available
+      const teamPlayers = LAB_TEAM_ROSTERS[pageTeam];
+      if (teamPlayers && teamPlayers.length >= 2) {
+        LAB_STATE.player = teamPlayers[0].name;
+        LAB_STATE.compare = teamPlayers[1].name;
+      }
+    }
+  } else if (!LAB_STATE.selected.length) {
+    LAB_STATE.selected = currentRoster().slice(0, 5).map(p => p.name);
+  }
+
   populateLabSelects();
   const playerSelect = document.getElementById('advancedPlayerSelect');
   const compareSelect = document.getElementById('advancedCompareSelect');
@@ -1207,15 +1341,7 @@ function handleGlobalSearch(query) {
   });
 }
 
-// ── NAVIGATION RAIL ────────────────────────────────────
-function moveNavRail(item) {
-  const rail = document.getElementById('navRail');
-  const nav = document.getElementById('sideNav');
-  if (!rail || !nav || !item) return;
-  const navRect = nav.getBoundingClientRect();
-  const itemRect = item.getBoundingClientRect();
-  rail.style.top = (itemRect.top - navRect.top + nav.scrollTop) + 'px';
-}
+
 
 // ── INITIALIZATION ─────────────────────────────────────
 let tickerHandle = null;
@@ -1620,15 +1746,7 @@ function initDashboard() {
   renderStandings('west', 'standingsListWest');
   renderStandings('east', 'standingsListEast');
 
-  // ── NAV RAIL ──
-  document.querySelectorAll('.nav-item:not([data-rail-bound])').forEach(item => {
-    item.setAttribute('data-rail-bound', '1');
-    item.addEventListener('click', function () {
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      this.classList.add('active');
-      moveNavRail(this);
-    });
-  });
+
 
   _rebuildSearchIndexDebounced();
   renderLeaders('pts');

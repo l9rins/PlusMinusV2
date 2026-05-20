@@ -69,7 +69,7 @@ def load_season(season: str) -> pd.DataFrame:
         return merged
 
     except Exception as e:
-        print(f"  ⚠ Season {season} load failed: {e}")
+        print(f"  [WARN] Season {season} load failed: {e}")
         return pd.DataFrame()
 
 
@@ -79,7 +79,7 @@ def load_seasons(seasons: list) -> pd.DataFrame:
         df = load_season(s)
         if not df.empty:
             frames.append(df)
-            print(f"  ✓ {s}: {len(df)} games loaded")
+            print(f"  [OK] {s}: {len(df)} games loaded")
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
