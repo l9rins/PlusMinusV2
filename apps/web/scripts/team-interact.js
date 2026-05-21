@@ -10,7 +10,26 @@
   /* ═══ TOOLTIP SYSTEM ═══ */
   let pmTip = null;
   function ensureTip(){
-    if(!pmTip){ pmTip=document.createElement('div'); pmTip.className='pm-tooltip'; pmTip.style.display='none'; document.body.appendChild(pmTip); }
+    if(!pmTip){
+      pmTip=document.createElement('div');
+      pmTip.className='pm-tooltip';
+      // Inline styles to guarantee a floaty glassmorphic premium look
+      pmTip.style.position='absolute';
+      pmTip.style.zIndex='10000';
+      pmTip.style.pointerEvents='none';
+      pmTip.style.background='rgba(12, 12, 20, 0.9)';
+      pmTip.style.backdropFilter='blur(12px)';
+      pmTip.style.webkitBackdropFilter='blur(12px)';
+      pmTip.style.border='1px solid rgba(255, 255, 255, 0.12)';
+      pmTip.style.borderRadius='4px';
+      pmTip.style.padding='8px 10px';
+      pmTip.style.boxShadow='0 4px 16px rgba(0, 0, 0, 0.5)';
+      pmTip.style.color='var(--text)';
+      pmTip.style.fontSize='11px';
+      pmTip.style.lineHeight='1.45';
+      pmTip.style.display='none';
+      document.body.appendChild(pmTip);
+    }
     return pmTip;
   }
   function showTip(html,x,y){
@@ -415,12 +434,140 @@
   const winProbChart=document.getElementById('winProbChartSvg');
   if(winProbChart){
     winProbChart.addEventListener('mousemove', ev=>{
-      const rect=winProbChart.getBoundingClientRect();
-      const pct=((ev.clientX-rect.left)/rect.width*100).toFixed(0);
-      const winPct=winProbChart.dataset.winPct || '50.0';
-      showTip(`<strong>Possession ${pct}%</strong><div>Win Prob: ${winPct}%</div>`,ev.pageX,ev.pageY);
+      try {
+        const pointsStr = winProbChart.dataset.points;
+        if (!pointsStr) return;
+        const points = JSON.parse(pointsStr);
+        if (!Array.isArray(points) || !points.length) return;
+
+        const rect = winProbChart.getBoundingClientRect();
+        const xFraction = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+        // The SVG chart extends from x=24 to x=352 (width 328)
+        const svgX = 24 + xFraction * 328;
+
+        // Find closest point by x coordinate
+        let closest = points[0];
+        let minDist = Math.abs(points[0].x - svgX);
+        let closestIndex = 0;
+        for (let i = 1; i < points.length; i++) {
+          const d = Math.abs(points[i].x - svgX);
+          if (d < minDist) {
+            minDist = d;
+            closest = points[i];
+            closestIndex = i;
+          }
+        }
+
+        // Dynamically position tracking elements inside the SVG
+        const group = document.getElementById('winProbScrubberGroup');
+        const vLine = document.getElementById('winProbVerticalLine');
+        const hLine = document.getElementById('winProbHorizontalLine');
+        const glowCircle = document.getElementById('winProbTrackGlow');
+        const trackCircle = document.getElementById('winProbTrackCircle');
+        const yBadge = document.getElementById('winProbYBadgeGroup');
+        const yBadgeText = document.getElementById('winProbYBadgeText');
+        const xBadge = document.getElementById('winProbXBadgeGroup');
+        const xBadgeText = document.getElementById('winProbXBadgeText');
+
+        if (group && vLine && glowCircle && trackCircle) {
+          group.setAttribute('opacity', '1');
+          vLine.setAttribute('x1', closest.x.toFixed(1));
+          vLine.setAttribute('x2', closest.x.toFixed(1));
+          if (hLine) {
+            hLine.setAttribute('y1', closest.y.toFixed(1));
+            hLine.setAttribute('y2', closest.y.toFixed(1));
+          }
+          if (yBadge) {
+            yBadge.setAttribute('transform', `translate(1, ${closest.y.toFixed(1)})`);
+          }
+          if (yBadgeText) {
+            yBadgeText.textContent = `${Math.round(closest.p)}%`;
+          }
+          if (xBadge) {
+            xBadge.setAttribute('transform', `translate(${closest.x.toFixed(1)}, 310)`);
+          }
+          if (xBadgeText) {
+            xBadgeText.textContent = `Poss. ${closestIndex + 1}`;
+          }
+          glowCircle.setAttribute('cx', closest.x.toFixed(1));
+          glowCircle.setAttribute('cy', closest.y.toFixed(1));
+          trackCircle.setAttribute('cx', closest.x.toFixed(1));
+          trackCircle.setAttribute('cy', closest.y.toFixed(1));
+        }
+
+        // Gather team names from dataset
+        const home = winProbChart.dataset.homeTeam || 'HOME';
+        const away = winProbChart.dataset.awayTeam || 'AWY';
+
+        const color = closest.p > 50 ? 'var(--lime)' : 'var(--blue)';
+        const leadTeam = closest.p > 50 ? home : away;
+        const leadPct = closest.p > 50 ? Math.round(closest.p) : Math.round(100 - closest.p);
+
+        // Render breathtaking glassmorphic live momentum HUD tooltip
+        const html = `
+          <div style="font-family:var(--mono);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Momentum Tracker</div>
+          <div style="font-size:11px;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:6px;color:var(--text)">
+            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${color};box-shadow:0 0 8px ${color};"></span>
+            Possession ${closestIndex + 1}
+          </div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.45;">
+            <strong style="color:${color};font-family:var(--mono);font-weight:700">${leadTeam}</strong> possesses a <strong style="color:var(--text);font-weight:800">${leadPct}%</strong> win probability
+          </div>
+          <div style="margin-top:6px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.06);font-size:8px;color:var(--muted2);font-family:var(--mono);letter-spacing:0.4px;">
+            Baseline Differential: ${Math.abs(Math.round(closest.p - 50))}% vs parity
+          </div>
+        `;
+
+        showTip(html, ev.pageX, ev.pageY);
+      } catch (err) {
+        console.warn('[PM] Scrubber scrubbing error:', err);
+      }
     });
-    winProbChart.addEventListener('mouseleave', hideTip);
+
+    winProbChart.addEventListener('mouseleave', () => {
+      const group = document.getElementById('winProbScrubberGroup');
+      if (group) group.setAttribute('opacity', '0');
+      hideTip();
+    });
+  }
+
+  const radarChart=document.getElementById('radarChartSvg');
+  if(radarChart){
+    radarChart.addEventListener('mousemove', ev => {
+      const node = ev.target.closest('.radar-node');
+      if (node) {
+        const statName = node.dataset.stat;
+        const p1Val = node.dataset.p1Val;
+        const p2Val = node.dataset.p2Val;
+        const p1Name = node.dataset.p1Name;
+        const p2Name = node.dataset.p2Name;
+        const maxVal = node.dataset.maxVal;
+
+        const p1Percent = Math.round((parseFloat(p1Val) / parseFloat(maxVal)) * 100);
+        const p2Percent = Math.round((parseFloat(p2Val) / parseFloat(maxVal)) * 100);
+
+        const html = `
+          <div style="font-family:var(--mono);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1.0px;margin-bottom:4px;">Comparative Radar HUD</div>
+          <div style="font-size:11px;font-weight:800;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime);"></span>
+            ${statName} Metric
+          </div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.45;margin-bottom:4px;">
+            <span style="color:var(--lime);font-family:var(--mono);font-weight:700">${p1Name}</span>: 
+            <strong style="color:var(--text);font-weight:800">${p1Val}</strong> <span style="font-size:9px;color:var(--muted)">(${p1Percent}% scale)</span>
+          </div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.45;padding-top:4px;border-top:1px solid rgba(255,255,255,0.06);">
+            <span style="color:var(--blue);font-family:var(--mono);font-weight:700">${p2Name}</span>: 
+            <strong style="color:var(--text);font-weight:800">${p2Val}</strong> <span style="font-size:9px;color:var(--muted)">(${p2Percent}% scale)</span>
+          </div>
+        `;
+        showTip(html, ev.pageX, ev.pageY);
+      } else {
+        hideTip();
+      }
+    });
+
+    radarChart.addEventListener('mouseleave', hideTip);
   }
 
   /* ═══ GLOBAL: hide tooltip on scroll/resize ═══ */

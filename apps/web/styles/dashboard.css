@@ -3727,6 +3727,43 @@ body {
   display: grid;
   grid-template-columns: minmax(320px, 1.1fr) minmax(260px, .85fr) minmax(260px, .95fr);
   gap: 10px;
+  align-items: stretch;
+}
+
+@media (min-width: 1181px) {
+  .radar-block,
+  .win-block {
+    position: relative;
+    height: 100%;
+  }
+
+  .radar-block .chart-head,
+  .win-block .chart-head {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    box-sizing: border-box;
+  }
+
+  .radar-wrap {
+    position: absolute;
+    top: 48px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-sizing: border-box;
+  }
+
+  .winprob-wrap {
+    position: absolute;
+    top: 48px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-sizing: border-box;
+  }
 }
 
 .chart-block,
@@ -3736,6 +3773,8 @@ body {
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, .026);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .chart-head {
@@ -3771,14 +3810,30 @@ body {
   padding-top: 3px;
 }
 
-.shot-chart-wrap,
-.radar-wrap,
-.winprob-wrap {
+.shot-chart-wrap {
   min-height: 268px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 10px;
+}
+
+.radar-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0px 10px 10px 10px;
+  min-height: 0;
+}
+
+.winprob-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  min-height: 0;
 }
 
 .shot-chart {
@@ -3831,11 +3886,33 @@ body {
   text-transform: uppercase;
 }
 
-.radar-svg,
+.radar-svg {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.radar-node {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+}
+
+.radar-node:hover {
+  r: 5.5px !important;
+  stroke-width: 2.2px !important;
+  fill: var(--text) !important;
+  filter: drop-shadow(0 0 4px var(--lime));
+}
+
+.radar-node[data-stat]:hover {
+  filter: drop-shadow(0 0 5px currentColor);
+}
+
+
 .winprob-svg {
   width: 100%;
-  max-width: 360px;
-  height: auto;
+  height: 100%;
 }
 
 .radar-axis-label,

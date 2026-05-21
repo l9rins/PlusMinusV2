@@ -172,6 +172,7 @@ export default {
       case '/api/play_types': response = await handleBackendDataProxy(env, url, '/api/play_types', 12000); break;
       case '/api/injuries':   response = await handleBackendDataProxy(env, url, '/api/injuries', 12000); break;
       case '/api/playerlog':  response = await handleBackendDataProxy(env, url, '/api/playerlog', 12000); break;
+      case '/api/team_stats': response = await handleBackendDataProxy(env, url, '/api/team_stats', 12000); break;
       case '/api/predict':    response = await handlePredictProxy(env, url); break;
       case '/api/slate':      response = await handleSlateProxy(env, url); break;
       case '/api/backend-health': response = await handleBackendHealth(env); break;

@@ -684,26 +684,78 @@ function renderRadar(profile, compareProfile) {
     const angle = -Math.PI / 2 + (Math.PI * 2 * i) / axes.length;
     const x = Math.cos(angle) * 100;
     const y = Math.sin(angle) * 100;
-    const lx = Math.cos(angle) * 111;
-    const ly = Math.sin(angle) * 111;
-    return `<line x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,.1)"/>
-      <text class="radar-axis-label" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="middle">${a[0]}</text>`;
+    const lx = Math.cos(angle) * 114;
+    const ly = Math.sin(angle) * 114;
+    return `
+      <!-- Solid tick spokes -->
+      <line x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,.09)" stroke-width="1"/>
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.5" fill="rgba(255,255,255,0.3)" />
+      <text class="radar-axis-label" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-weight="bold">${a[0]}</text>`;
   }).join('');
+
+  // Technical polygon web rings with subtle grid tick labels
   const rings = [25, 50, 75, 100].map(r => {
     const pts = axes.map((_, i) => {
       const angle = -Math.PI / 2 + (Math.PI * 2 * i) / axes.length;
       return `${(Math.cos(angle) * r).toFixed(1)},${(Math.sin(angle) * r).toFixed(1)}`;
     }).join(' ');
-    return `<polygon points="${pts}" fill="none" stroke="rgba(255,255,255,.08)"/>`;
+    
+    // Add small percentage indicator label on the top vertical axis
+    const label = r === 100 ? `<text x="5" y="${-r + 3}" font-family="var(--mono)" font-size="6" fill="var(--muted)" opacity="0.6">100%</text>` : '';
+
+    return `
+      <polygon points="${pts}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="0.8" stroke-dasharray="${r === 100 ? 'none' : '2 2'}"/>
+      ${label}
+    `;
   }).join('');
+
+  const p1LastName = profile.name.split(' ').pop();
+  const p2LastName = compareProfile.name.split(' ').pop();
+
+  // Create highly interactive hover nodes
+  const nodes = axes.flatMap((a, i) => {
+    const angle = -Math.PI / 2 + (Math.PI * 2 * i) / axes.length;
+    const r1 = Math.max(16, Math.min(92, (a[1] / a[3]) * 92));
+    const x1 = Math.cos(angle) * r1;
+    const y1 = Math.sin(angle) * r1;
+    const r2 = Math.max(16, Math.min(92, (a[2] / a[3]) * 92));
+    const x2 = Math.cos(angle) * r2;
+    const y2 = Math.sin(angle) * r2;
+
+    return [
+      `<circle cx="${x1.toFixed(1)}" cy="${y1.toFixed(1)}" r="3.5" fill="#05050a" stroke="var(--lime)" stroke-width="1.6" class="radar-node" data-stat="${a[0]}" data-p1-val="${a[1]}" data-p2-val="${a[2]}" data-p1-name="${p1LastName}" data-p2-name="${p2LastName}" data-max-val="${a[3]}" style="cursor: pointer;" />`,
+      `<circle cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="3.5" fill="#05050a" stroke="var(--blue)" stroke-width="1.6" class="radar-node" data-stat="${a[0]}" data-p1-val="${a[1]}" data-p2-val="${a[2]}" data-p1-name="${p1LastName}" data-p2-name="${p2LastName}" data-max-val="${a[3]}" style="cursor: pointer;" />`
+    ];
+  }).join('');
+
   wrap.innerHTML = `
-    <svg class="radar-svg" viewBox="-128 -124 256 248" role="img" aria-label="Radar comparison">
+    <svg class="radar-svg" viewBox="-135 -130 270 260" role="img" aria-label="Radar comparison" style="overflow: visible;">
+      <!-- Center Telemetry Crosshairs -->
+      <g stroke="rgba(255,255,255,0.06)" stroke-width="0.8" fill="none">
+        <line x1="-12" y1="0" x2="12" y2="0" />
+        <line x1="0" y1="-12" x2="0" y2="12" />
+        <circle cx="0" cy="0" r="3" />
+      </g>
+
       ${rings}
       ${axisLines}
-      <polygon points="${toPoints(1)}" fill="rgba(197,248,42,.18)" stroke="var(--lime)" stroke-width="2"/>
-      <polygon points="${toPoints(2)}" fill="rgba(60,174,255,.14)" stroke="var(--blue)" stroke-width="2"/>
-      <text x="-112" y="112" class="radar-axis-label" fill="var(--lime)">${esc(profile.name.split(' ').pop())}</text>
-      <text x="112" y="112" class="radar-axis-label" fill="var(--blue)" text-anchor="end">${esc(compareProfile.name.split(' ').pop())}</text>
+
+      <!-- Comparison Shapes with mix-blend-mode for breathtaking neon overlap color -->
+      <g style="mix-blend-mode: screen;">
+        <polygon points="${toPoints(1)}" fill="rgba(197,248,42,.12)" stroke="var(--lime)" stroke-width="2" class="radar-shape" style="filter: drop-shadow(0 0 3px rgba(197,248,42,0.15));" />
+        <polygon points="${toPoints(2)}" fill="rgba(60,174,255,.09)" stroke="var(--blue)" stroke-width="2" class="radar-shape" style="filter: drop-shadow(0 0 3px rgba(60,174,255,0.12));" />
+      </g>
+
+      ${nodes}
+
+      <!-- Bottom player name tags styled as telemetry badges -->
+      <g transform="translate(0, 118)" font-family="var(--mono)" font-size="7.5" font-weight="bold">
+        <!-- Player 1 (Lime) Tag -->
+        <text x="-92" y="2.5" fill="var(--lime)" text-anchor="middle">${esc(p1LastName.toUpperCase())}</text>
+
+        <!-- Player 2 (Blue) Tag -->
+        <text x="92" y="2.5" fill="var(--blue)" text-anchor="middle">${esc(p2LastName.toUpperCase())}</text>
+      </g>
     </svg>`;
 }
 
@@ -714,25 +766,145 @@ function renderWinProbability(profile) {
   const games = window.PMData?.SCOREBOARD || [];
   const live = games.find(g => g.status === 2) || games[0];
   const rand = _seededRandom(`${profile.name}:winprob:${live?.id || 'demo'}`);
-  const base = live ? 50 + ((live.home?.score || 0) - (live.away?.score || 0)) * 1.6 : _range(`${profile.name}:wpbase`, 42, 62, 1);
-  let current = Math.max(8, Math.min(92, base));
+  const base = live ? 50 + ((live.home?.score || 0) - (live.away?.score || 0)) * 1.6 : _range(`${profile.name}:wpbase`, 45, 95, 1);
+  let current = Math.max(45, Math.min(95, base));
+  
+  // Y-axis minimum is 45%, maximum is 95%. Range = 50.
+  // 1 percentage point = 5.6px.
+  // y = 310 - (current - 45) * 5.6
   const points = Array.from({ length: 14 }, (_, i) => {
-    current = Math.max(6, Math.min(94, current + (rand() - .45) * 12));
-    return { x: 24 + i * 25, y: 186 - current * 1.55, p: current };
+    current = Math.max(45, Math.min(95, current + (rand() - .45) * 12));
+    return { x: 24 + i * 25, y: 310 - (current - 45) * 5.6, p: current };
   });
-  const path = points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+
+  // Calculate high-fidelity smooth cubic Bezier path
+  let smoothPath = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const dx = (p1.x - p0.x) / 2;
+    const cp1x = p0.x + dx;
+    const cp1y = p0.y;
+    const cp2x = p1.x - dx;
+    const cp2y = p1.y;
+    smoothPath += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+  }
+
+  const areaPath = `${smoothPath} L ${points.at(-1).x.toFixed(1)} 310 L ${points[0].x.toFixed(1)} 310 Z`;
   const last = points.at(-1)?.p ?? current;
-  if (meta) meta.textContent = live ? `${live.away?.tricode || 'AWY'} @ ${live.home?.tricode || 'HOME'} / ${Math.round(last)}%` : `SIM / ${Math.round(last)}%`;
+  
+  if (meta) {
+    meta.textContent = live ? `${live.away?.tricode || 'AWY'} @ ${live.home?.tricode || 'HOME'} / ${Math.round(last)}%` : `SIM / ${Math.round(last)}%`;
+  }
+  
+  const homeCode = live?.home?.tricode || 'HOME';
+  const awayCode = live?.away?.tricode || 'AWY';
+
+  // Store the points JSON and active team codes in the container dataset for the interactive hover scrubber
+  wrap.dataset.points = JSON.stringify(points);
+  wrap.dataset.homeTeam = homeCode;
+  wrap.dataset.awayTeam = awayCode;
+
   wrap.innerHTML = `
-    <svg class="winprob-svg" viewBox="0 0 380 220" role="img" aria-label="Win probability chart">
-      <defs><linearGradient id="winProbFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--lime)" stop-opacity=".24"/><stop offset="1" stop-color="var(--lime)" stop-opacity="0"/></linearGradient></defs>
-      <line x1="24" y1="108" x2="352" y2="108" stroke="rgba(255,255,255,.12)" stroke-dasharray="4 5"/>
-      <path d="${path} L352 202 L24 202 Z" fill="url(#winProbFill)"/>
-      <path d="${path}" fill="none" stroke="var(--lime)" stroke-width="2.4"/>
-      ${points.map((p, i) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${i === points.length - 1 ? 4 : 2}" fill="${i === points.length - 1 ? 'var(--coral)' : 'var(--lime)'}"><title>Possession ${i + 1}: ${Math.round(p.p)}%</title></circle>`).join('')}
-      <text x="24" y="22" class="winprob-label">WIN PROB</text>
-      <text x="352" y="22" text-anchor="end" class="winprob-label">${Math.round(last)}%</text>
-      <text x="24" y="212" class="winprob-label">Q1</text>
+    <svg class="winprob-svg" viewBox="0 0 380 350" preserveAspectRatio="none" role="img" aria-label="Win probability chart" style="overflow: visible; width: 100%; height: 100%;">
+      <defs>
+        <!-- Premium glassmorphic area gradient - clean, subtle, and themed in solid blue -->
+        <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--blue)" stop-opacity="0.09" />
+          <stop offset="50%" stop-color="var(--blue)" stop-opacity="0.02" />
+          <stop offset="100%" stop-color="var(--blue)" stop-opacity="0" />
+        </linearGradient>
+        
+        <!-- Glowing scrubber hover pulse radial gradient - themed in solid blue -->
+        <radialGradient id="scrubberGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="var(--blue)" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="var(--blue)" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+
+      <style>
+        @keyframes livePulse {
+          0% { transform: scale(1); opacity: 0.6; }
+          50% { transform: scale(1.4); opacity: 0.1; }
+          100% { transform: scale(1); opacity: 0.6; }
+        }
+        .live-pulse-ring {
+          transform-origin: ${points.at(-1).x.toFixed(1)}px ${points.at(-1).y.toFixed(1)}px;
+          animation: livePulse 2s infinite ease-in-out;
+        }
+        .winprob-node {
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .winprob-node:hover {
+          r: 4.5px !important;
+          stroke-width: 2.0px !important;
+        }
+      </style>
+
+      <!-- Dynamic team watermark labels (Premium sports design element) -->
+      <text x="24" y="22" font-family="var(--mono)" font-size="8.5" font-weight="bold" fill="var(--text)" opacity="0.32">${homeCode}</text>
+      <text x="24" y="324" font-family="var(--mono)" font-size="8.5" font-weight="bold" fill="var(--text)" opacity="0.32">${awayCode}</text>
+
+      <!-- Grid lines - fine-tuned, extremely subtle, and aligned to 350px height -->
+      <g class="grid-lines" opacity="0.08">
+        <line x1="24" y1="30" x2="352" y2="30" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" />
+        <line x1="24" y1="100" x2="352" y2="100" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" />
+        <line x1="24" y1="170" x2="352" y2="170" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" />
+        <line x1="24" y1="240" x2="352" y2="240" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" />
+        <line x1="24" y1="310" x2="352" y2="310" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" />
+      </g>
+
+      <!-- Side Grid Labels - beautifully aligned to new grid coordinate layout -->
+      <text x="14" y="33" class="winprob-label" text-anchor="end" font-size="7" fill="var(--muted)">95%</text>
+      <text x="14" y="103" class="winprob-label" text-anchor="end" font-size="7" fill="var(--muted)">82%</text>
+      <text x="14" y="173" class="winprob-label" text-anchor="end" font-size="7" fill="var(--muted)">70%</text>
+      <text x="14" y="243" class="winprob-label" text-anchor="end" font-size="7" fill="var(--muted)">57%</text>
+      <text x="14" y="313" class="winprob-label" text-anchor="end" font-size="7" fill="var(--muted)">45%</text>
+
+      <!-- Spline Area under curve -->
+      <path d="${areaPath}" fill="url(#areaGradient)" />
+
+      <!-- Primary dynamic spline curve - solid blue branding, sharp and high-precision -->
+      <path d="${smoothPath}" fill="none" stroke="var(--blue)" stroke-width="2.2" />
+
+      <!-- Grid Nodes - sharp, sleek, blue branded -->
+      ${points.map((p, i) => `
+        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.2" fill="#05050a" stroke="${i === points.length - 1 ? 'var(--lime)' : 'var(--blue)'}" stroke-width="1.4" class="winprob-node" data-index="${i}">
+          <title>Possession ${i + 1}: ${Math.round(p.p)}%</title>
+        </circle>
+      `).join('')}
+
+      <!-- Pulsing halo for live state -->
+      <circle cx="${points.at(-1).x.toFixed(1)}" cy="${points.at(-1).y.toFixed(1)}" r="6" fill="none" stroke="var(--lime)" stroke-width="1.0" opacity="0.6" class="live-pulse-ring" />
+
+      <!-- Dynamic cursor crosshair tracker & dynamic badges (High-fidelity overlay) -->
+      <g id="winProbScrubberGroup" opacity="0" style="transition: opacity 0.25s ease;">
+        <!-- Vertical crosshair -->
+        <line id="winProbVerticalLine" x1="0" y1="30" x2="0" y2="310" stroke="rgba(255,255,255,0.18)" stroke-width="1" stroke-dasharray="2 2" />
+        
+        <!-- Horizontal crosshair (Premium design addition) -->
+        <line id="winProbHorizontalLine" x1="24" y1="0" x2="352" y2="0" stroke="rgba(255,255,255,0.18)" stroke-width="1" stroke-dasharray="2 2" />
+        
+        <!-- Y-Axis Value Badge (Floats dynamically on y-axis) -->
+        <g id="winProbYBadgeGroup" transform="translate(0, 0)">
+          <rect x="-1" y="-7" width="22" height="14" rx="3" fill="#0d0d18" stroke="rgba(255,255,255,0.15)" stroke-width="0.8" />
+          <text id="winProbYBadgeText" x="10" y="3.2" font-size="7.5" font-family="var(--mono)" fill="var(--blue)" text-anchor="middle" font-weight="bold">50%</text>
+        </g>
+
+        <!-- X-Axis Value Badge (Floats dynamically on timeline axis) -->
+        <g id="winProbXBadgeGroup" transform="translate(0, 0)">
+          <rect x="-24" y="3" width="48" height="13" rx="3" fill="#0d0d18" stroke="rgba(255,255,255,0.15)" stroke-width="0.8" />
+          <text id="winProbXBadgeText" x="0" y="12" font-size="7.5" font-family="var(--mono)" fill="var(--muted)" text-anchor="middle">Poss. 1</text>
+        </g>
+
+        <circle id="winProbTrackGlow" cx="0" cy="0" r="8" fill="url(#scrubberGlow)" pointer-events="none" />
+        <circle id="winProbTrackCircle" cx="0" cy="0" r="3.5" fill="var(--blue)" stroke="#05050a" stroke-width="1.8" pointer-events="none" />
+      </g>
+
+      <!-- X-Axis Labels -->
+      <text x="24" y="336" class="winprob-label" font-size="8" fill="var(--muted)">Possession Flow ➔</text>
+      <text x="352" y="336" text-anchor="end" class="winprob-label" font-size="8" fill="var(--muted)">4th Quarter</text>
     </svg>`;
 }
 
