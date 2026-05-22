@@ -12,6 +12,8 @@ let RECENT_GAMES = [];
 let PREDICTIONS = {};
 let SCHEDULE_MAP = {};
 let INJURY_SNAPSHOT = { outCount: 0, details: [] };
+let ROSTER_LOADING = true;
+let SCHEDULE_LOADING = true;
 let CURRENT_DATE_RANGE = 15;
 let CURRENT_LINEUP_MIN = 120;
 let LINEUP_COMBOS = [];
@@ -31,8 +33,28 @@ async function initTeamPage() {
   setupTabHandlers();
   setupAnalyticsInteractions();
 
+  // Paint from cache immediately if we have something usable
+  const cachedStandingsEntry = window.pmReadClientCache
+    ? window.pmReadClientCache('standings_teampage', 'standings', true)
+    : null;
+  if (cachedStandingsEntry?.data) {
+    const cachedStandings = cachedStandingsEntry.data;
+    if (!TEAM_ABBR || TEAM_ABBR.length < 2 || TEAM_ABBR.length > 3 || !extractTeamFromStandings(cachedStandings, TEAM_ABBR)) {
+      TEAM_ABBR = resolveDefaultTeamAbbr(cachedStandings);
+      const url = new URL(window.location.href);
+      url.searchParams.set('team', TEAM_ABBR);
+      window.history.replaceState({}, '', url);
+    }
+    TEAM_DATA = extractTeamFromStandings(cachedStandings, TEAM_ABBR);
+    if (TEAM_DATA) {
+      try { renderTeamHeader(); } catch (e) { console.warn('[PM] Cached header render failed:', e.message); }
+    }
+  }
+
+  const standingsPromise = fetchStandings();
+
   try {
-    const standings = await fetchStandings();
+    const standings = cachedStandingsEntry?.data || await standingsPromise;
 
     if (!standings) throw new Error('No standings data');
 
@@ -45,6 +67,15 @@ async function initTeamPage() {
 
     TEAM_DATA = extractTeamFromStandings(standings, TEAM_ABBR);
     if (!TEAM_DATA) throw new Error(`Team ${TEAM_ABBR} not found`);
+
+    // If we didn't have cached data, paint the header as soon as standings arrive
+    if (!cachedStandingsEntry?.data) {
+      try {
+        renderTeamHeader();
+      } catch (e) {
+        console.warn('[PM] Early team header render failed:', e.message);
+      }
+    }
 
     // Fetch real team stats from prediction API and merge
     try {
@@ -70,21 +101,13 @@ async function initTeamPage() {
       console.warn('[PM] Failed to fetch real team stats, using heuristics:', e.message);
     }
 
-    const [schedule, roster] = await Promise.all([
-      fetchSchedule(),
-      fetchRoster(),
-    ]);
-
-    SCHEDULE_MAP = schedule || {};
-    SCHEDULE_DATA = flattenTeamSchedule(SCHEDULE_MAP, TEAM_ABBR);
-    ROSTER_DATA = await enrichRosterPlayers(Array.isArray(roster) ? roster : (roster?.players || []));
-    await loadInjurySnapshot();
     try { localStorage.setItem('pm_last_team', TEAM_ABBR); } catch {}
 
-    renderTeamHeader();
     renderInjuryTicker();
     renderScoutReport();
     renderFourFactors();
+    renderRosterSkeleton();
+    renderScheduleSkeleton();
     
     // Render all analytics sections
     renderTeamOverview();
@@ -99,29 +122,197 @@ async function initTeamPage() {
     renderTeamAdvancedMetrics();
     applyMetricTooltips();
 
+    // Start auto-refreshing live data for the team page
+    startAutoRefresh();
+
+    // Bootstrap Player Analytics Lab as soon as the core page is painted
+    if (typeof window.initAnalyticsLab === 'function') {
+      window.initAnalyticsLab();
+    }
+
+    // Load slower supporting data after the page has already rendered core content
+    void loadSupportingTeamData();
+
   } catch (err) {
     console.error('[PM] Team page init failed:', err);
     renderError(`Failed to load ${TEAM_ABBR}: ${err.message}`);
     return;
   }
 
-  // Each section loads independently — one failure won't crash the others
-  try { await loadRecentGames(); } catch (e) { console.warn('[PM] Recent games failed:', e.message); }
-  // Re-render scout report now that recent games / L10 data is available
-  try { renderScoutReport(); } catch (e) { console.warn('[PM] Scout report re-render failed:', e.message); }
-  try {
-    renderTeamOverview();
-    renderTeamAdvancedMetrics();
-  } catch (e) {
-    console.warn('[PM] Post-recent analytics render failed:', e.message);
-  }
-  try { renderRoster(); } catch (e) { console.warn('[PM] Roster render failed:', e.message); }
-  try { await renderSchedule(); } catch (e) { console.warn('[PM] Schedule render failed:', e.message); }
+}
 
-  // Bootstrap Player Analytics Lab now that data is ready
-  if (typeof window.initAnalyticsLab === 'function') {
-    window.initAnalyticsLab();
+async function loadSupportingTeamData() {
+  const cachedScheduleEntry = window.pmReadClientCache ? window.pmReadClientCache(`schedule_${TEAM_ABBR}_v2`, 'schedule', true) : null;
+  const cachedRecentEntry = window.pmReadClientCache ? window.pmReadClientCache(`schedule_recent_${TEAM_ABBR}_v1`, 'schedule', true) : null;
+
+  if (cachedScheduleEntry?.data) {
+    SCHEDULE_MAP = cachedScheduleEntry.data || {};
+    SCHEDULE_DATA = flattenTeamSchedule(SCHEDULE_MAP, TEAM_ABBR);
+      SCHEDULE_LOADING = false;
   }
+  if (cachedRecentEntry?.data) {
+    RECENT_GAMES = Array.isArray(cachedRecentEntry.data) ? cachedRecentEntry.data : RECENT_GAMES;
+  }
+
+  try { if (cachedScheduleEntry?.data || cachedRecentEntry?.data) renderSchedule(); } catch (e) { console.warn('[PM] Cached schedule render failed:', e.message); }
+
+  const schedulePromise = fetchSchedule().catch(() => null);
+  const rosterPromise = fetchRosterWithRetry().catch(() => null);
+  const injuryPromise = loadInjurySnapshot().catch(() => null);
+  const recentPromise = loadRecentGames().catch(() => null);
+
+  // Schedule should appear as soon as raw schedule data lands.
+  schedulePromise.then(async schedule => {
+    if (!schedule) return;
+    SCHEDULE_MAP = schedule || {};
+    SCHEDULE_DATA = flattenTeamSchedule(SCHEDULE_MAP, TEAM_ABBR);
+    SCHEDULE_LOADING = false;
+    try { renderSchedule(); } catch (e) { console.warn('[PM] Schedule render failed:', e.message); }
+  });
+
+  // Roster should paint immediately from raw player list, then enrich in the background.
+  rosterPromise.then(async roster => {
+    if (!roster) {
+      try { renderRosterSkeleton(); } catch (e) { console.warn('[PM] Roster skeleton render failed:', e.message); }
+      return;
+    }
+    const rawRoster = Array.isArray(roster) ? roster : (roster?.players || []);
+    if (rawRoster.length) {
+      ROSTER_DATA = rawRoster;
+      ROSTER_LOADING = false;
+      try { renderRoster(); } catch (e) { console.warn('[PM] Roster render failed:', e.message); }
+      try { window.syncAnalyticsLabRoster?.(TEAM_ABBR, ROSTER_DATA); } catch (e) { console.warn('[PM] Analytics lab roster sync failed:', e.message); }
+      void enrichRosterPlayers(rawRoster)
+        .then(enriched => {
+          if (Array.isArray(enriched) && enriched.length) {
+            ROSTER_DATA = enriched;
+            try { renderRoster(); } catch {}
+            try { window.syncAnalyticsLabRoster?.(TEAM_ABBR, ROSTER_DATA); } catch {}
+          }
+        })
+        .catch(() => null);
+    } else {
+      try { renderRosterSkeleton(); } catch (e) { console.warn('[PM] Roster skeleton render failed:', e.message); }
+    }
+  });
+
+  injuryPromise.then(() => {
+    try { renderInjuryTicker(); } catch (e) { console.warn('[PM] Injury ticker render failed:', e.message); }
+    try { renderScoutReport(); } catch (e) { console.warn('[PM] Scout report render failed:', e.message); }
+    try { renderTeamOverview(); renderTeamAdvancedMetrics(); } catch (e) { console.warn('[PM] Background analytics render failed:', e.message); }
+  });
+
+  recentPromise.then(() => {
+    try { renderSchedule(); } catch (e) { console.warn('[PM] Schedule render failed:', e.message); }
+  });
+
+  Promise.allSettled([schedulePromise, rosterPromise, injuryPromise, recentPromise]).then(() => {
+    SCHEDULE_LOADING = false;
+    if (ROSTER_DATA && ROSTER_DATA.length) {
+      ROSTER_LOADING = false;
+      try { renderRoster(); } catch {}
+    } else {
+      try { renderRosterSkeleton(); } catch {}
+    }
+    try { renderSchedule(); } catch {}
+  });
+}
+
+// ─── REALTIME (SSE → WebSocket fallback) ───────────────────────────────────
+function handleRealTimeMessage(msg) {
+  // Expected message shape: { type: 'team_update'|'standings'|'schedule'|'roster'|'recent_games' }
+  const t = (msg && msg.type) ? String(msg.type) : null;
+  if (!t) return;
+  const badge = document.getElementById('analyticsFreshness');
+  if (badge) {
+    badge.textContent = t.replace(/_/g, ' ').toUpperCase();
+  }
+  if (t === 'team_update' || t === 'predict_update' || t === 'injury_update') {
+    // lightweight
+    refreshTeamData(false);
+  } else if (t === 'team_stats_refresh' || t === 'injury_refresh' || t === 'shot_zones_refresh' || t === 'play_types_refresh' || t === 'schedule_refresh') {
+    refreshTeamData(false);
+  } else if (t === 'standings' || t === 'standings_update') {
+    refreshTeamData(false);
+  } else if (t === 'schedule' || t === 'roster' || t === 'recent_games' || t === 'full_update') {
+    refreshTeamData(true);
+  } else {
+    // Unknown: do a light refresh
+    refreshTeamData(false);
+  }
+}
+
+function fallbackToWebSocket(base, path) {
+  try {
+    const wsProto = base.startsWith('https') ? 'wss' : 'ws';
+    const host = base.replace(/^https?:\/\//, '').replace(/:\d+$/, m => '');
+    const wsUrl = `${wsProto}://${base.replace(/^https?:\/\//, '').replace(/\/$/, '')}/ws?team=${TEAM_ABBR}`;
+    const ws = new WebSocket(wsUrl);
+    __pm_team_realtime_conn = ws;
+    ws.addEventListener('open', () => {
+      __pm_team_realtime_connected = true;
+      const badge = document.getElementById('analyticsFreshness');
+      if (badge) badge.textContent = 'LIVE WS';
+      console.info('[PM] WebSocket connected', wsUrl);
+      // stop polling while realtime is active
+      __pm_team_auto_handles.forEach(h => h && h.clear && h.clear());
+    });
+    ws.addEventListener('message', (ev) => {
+      try { const data = JSON.parse(ev.data); handleRealTimeMessage(data); } catch { handleRealTimeMessage({ type: 'team_update' }); }
+    });
+    ws.addEventListener('close', () => {
+      __pm_team_realtime_connected = false;
+      __pm_team_realtime_conn = null;
+      const badge = document.getElementById('analyticsFreshness');
+      if (badge) badge.textContent = 'READY';
+      console.info('[PM] WebSocket closed');
+    });
+    ws.addEventListener('error', (e) => { console.warn('[PM] WebSocket error', e); ws.close(); });
+  } catch (err) { console.warn('[PM] fallbackToWebSocket failed', err.message); }
+}
+
+function startRealtimeConnection() {
+  if (PM_IS_FILE) return;
+  if (__pm_team_realtime_conn) return;
+  const base = resolvePredictionApiBase();
+  const candidates = [
+    `${base.replace(/\/$/, '')}/events?team=${TEAM_ABBR}`,
+    `${base.replace(/\/$/, '')}/sse?team=${TEAM_ABBR}`,
+    `${base.replace(/\/$/, '')}/stream?team=${TEAM_ABBR}`,
+  ];
+
+  // Try EventSource first
+  try {
+    const esUrl = candidates[0];
+    const es = new EventSource(esUrl);
+    __pm_team_realtime_conn = es;
+    es.onopen = () => {
+      __pm_team_realtime_connected = true;
+      const badge = document.getElementById('analyticsFreshness');
+      if (badge) badge.textContent = 'LIVE SSE';
+      console.info('[PM] SSE connected', esUrl);
+      // stop polling while realtime is active
+      __pm_team_auto_handles.forEach(h => h && h.clear && h.clear());
+    };
+    es.onmessage = (e) => {
+      try { const data = JSON.parse(e.data); handleRealTimeMessage(data); } catch { handleRealTimeMessage({ type: 'team_update' }); }
+    };
+    es.onerror = (e) => {
+      try { es.close(); } catch {}
+      __pm_team_realtime_connected = false;
+      __pm_team_realtime_conn = null;
+      const badge = document.getElementById('analyticsFreshness');
+      if (badge) badge.textContent = 'READY';
+      console.warn('[PM] SSE error, falling back to WebSocket');
+      fallbackToWebSocket(base);
+    };
+    return;
+  } catch (err) {
+    console.warn('[PM] SSE construction failed:', err.message);
+  }
+
+  // If EventSource not available/failed, try WebSocket
+  fallbackToWebSocket(base);
 }
 
 
@@ -141,6 +332,8 @@ async function fetchSchedule() {
   return await _staleWhileRevalidate({
     cacheKey: `schedule_${TEAM_ABBR}_v2`, ttlKey: 'schedule', workerPath: `/api/schedule?days=14`,
     logLabel: `Team(${TEAM_ABBR}) → Schedule`,
+    timeoutMs: 30000,
+    retries: 1,
     processResponse(json) {
       return json?.schedule || json?.data?.schedule || json?.data || null;
     },
@@ -153,6 +346,8 @@ async function fetchRecentScheduleHistory() {
     cacheKey: `schedule_recent_${TEAM_ABBR}_v1`, ttlKey: 'schedule',
     workerPath: `/api/schedule?days=30&date=${anchorDate}`,
     logLabel: `Team(${TEAM_ABBR}) → Recent Schedule History`,
+    timeoutMs: 30000,
+    retries: 1,
     processResponse(json) {
       return json?.schedule || json?.data?.schedule || json?.data || null;
     },
@@ -160,16 +355,39 @@ async function fetchRecentScheduleHistory() {
 }
 
 async function fetchRoster() {
-  return await _staleWhileRevalidate({
-    cacheKey: `roster_${TEAM_ABBR}_v1`,
-    ttlKey: 'meta',
-    workerPath: `/api/team_top_players?team=${TEAM_ABBR}&n=10`,
-    logLabel: `Team(${TEAM_ABBR}) → Roster`,
-    processResponse(json) {
-      const players = normalizeTopPlayersResponse(json);
-      return players;
-    },
-  });
+  const freshToken = Date.now();
+  const base = typeof resolvePredictionApiBase === 'function' ? resolvePredictionApiBase() : (window.PRED_BACKEND || '').replace(/\/+$/, '');
+  let json = null;
+
+  if (/localhost|127\.0\.0\.1/i.test(base)) {
+    const rosterUrl = `${base}/api/full_roster?team=${encodeURIComponent(TEAM_ABBR)}&fresh=1&ts=${freshToken}`;
+    try {
+      const response = await fetch(rosterUrl, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`full_roster ${response.status}`);
+      json = await response.json();
+    } catch (err) {
+      console.warn('[PM] full_roster fetch failed, falling back to team_top_players:', err.message);
+      json = await workerFetch(`/api/team_top_players?team=${TEAM_ABBR}&n=10&fresh=1&ts=${freshToken}`, 12000, 0);
+    }
+  } else {
+    json = await workerFetch(`/api/team_top_players?team=${TEAM_ABBR}&n=10&fresh=1&ts=${freshToken}`, 12000, 0);
+  }
+
+  return normalizeTopPlayersResponse(json);
+}
+
+async function fetchRosterWithRetry(attempt = 0) {
+  try {
+    const roster = await fetchRoster();
+    const rawRoster = Array.isArray(roster) ? roster : (roster?.players || []);
+    if (rawRoster.length) return roster;
+  } catch (err) {
+    if (attempt >= 2) throw err;
+  }
+
+  if (attempt >= 2) return null;
+  await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+  return await fetchRosterWithRetry(attempt + 1);
 }
 
 async function loadInjurySnapshot() {
@@ -297,6 +515,92 @@ async function loadRecentGames() {
 
   renderRecentGames();
   renderTeamInsights();
+}
+
+// ─── AUTO-REFRESH HELPERS ─────────────────────────────────────────────────
+let __pm_team_auto_handles = [];
+let __pm_team_realtime_conn = null;
+let __pm_team_realtime_connected = false;
+async function refreshTeamData(full = false) {
+  try {
+    // Lightweight refresh: standings (quick) and injury snapshot
+    const standingsPromise = fetchStandings().catch(() => null);
+    const injuryPromise = loadInjurySnapshot().catch(() => null);
+
+    if (!full) {
+      const standings = await standingsPromise;
+      if (standings) {
+        const updated = extractTeamFromStandings(standings, TEAM_ABBR);
+        if (updated) {
+          TEAM_DATA = { ...TEAM_DATA, ...updated };
+        }
+      }
+      await injuryPromise;
+      renderTeamHeader();
+      renderInjuryTicker();
+      return;
+    }
+
+    // Full refresh: standings, schedule, roster, recent games + injury
+    const [standings, schedule, roster] = await Promise.all([
+      fetchStandings().catch(() => null),
+      fetchSchedule().catch(() => null),
+      fetchRoster().catch(() => null),
+    ]);
+
+    if (standings) {
+      const updated = extractTeamFromStandings(standings, TEAM_ABBR);
+      if (updated) TEAM_DATA = { ...TEAM_DATA, ...updated };
+    }
+    if (schedule) {
+      SCHEDULE_MAP = schedule || SCHEDULE_MAP;
+      SCHEDULE_DATA = flattenTeamSchedule(SCHEDULE_MAP, TEAM_ABBR);
+    }
+    if (roster) {
+      ROSTER_DATA = await enrichRosterPlayers(Array.isArray(roster) ? roster : (roster?.players || []));
+    }
+
+    await loadInjurySnapshot().catch(() => null);
+    try { await loadRecentGames(); } catch {}
+
+    // Re-render key sections
+    renderTeamHeader();
+    renderInjuryTicker();
+    renderFourFactors();
+    try { renderRoster(); } catch (e) { console.warn('[PM] Roster render after refresh failed', e.message); }
+    try { renderSchedule(); } catch (e) { console.warn('[PM] Schedule render after refresh failed', e.message); }
+  } catch (err) {
+    console.warn('[PM] refreshTeamData failed:', err.message);
+  }
+}
+
+function startAutoRefresh() {
+  // Clear previous handles if any
+  __pm_team_auto_handles.forEach(h => h && h.clear && h.clear());
+  __pm_team_auto_handles = [];
+
+  // Allow override via global config `window.PM_TEAM_REFRESH = { quick: ms, full: ms }`
+  const cfg = (window.PM_TEAM_REFRESH && typeof window.PM_TEAM_REFRESH === 'object') ? window.PM_TEAM_REFRESH : { quick: 30_000, full: 120_000 };
+  const quickMs = Number(cfg.quick) || 30_000;
+  const fullMs = Number(cfg.full) || 120_000;
+
+  // Start realtime connection; if connected it will clear polling handles
+  try { startRealtimeConnection(); } catch (e) { console.warn('[PM] startRealtimeConnection failed', e.message); }
+
+  // Short: quick header/injury refresh
+  __pm_team_auto_handles.push(visibilityInterval(() => {
+    if (!__pm_team_realtime_connected) refreshTeamData(false);
+  }, quickMs));
+
+  // Medium: recent games + roster + schedule
+  __pm_team_auto_handles.push(visibilityInterval(() => {
+    if (!__pm_team_realtime_connected) refreshTeamData(true);
+  }, fullMs));
+
+  // Cleanup on unload
+  window.addEventListener('beforeunload', () => {
+    __pm_team_auto_handles.forEach(h => h && h.clear && h.clear());
+  });
 }
 
 async function loadScoreboardForDate(dateKey) {
@@ -595,8 +899,13 @@ function renderRoster() {
   const tbody = document.getElementById('rosterTableBody');
   if (!tbody) return;
 
+  if (ROSTER_LOADING && (!ROSTER_DATA || ROSTER_DATA.length === 0)) {
+    renderRosterSkeleton();
+    return;
+  }
+
   if (!ROSTER_DATA || ROSTER_DATA.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="20" class="no-data">No roster data available</td></tr>';
+    renderRosterSkeleton();
     return;
   }
 
@@ -752,6 +1061,27 @@ function renderRoster() {
   }
 }
 
+function renderRosterSkeleton() {
+  const tbody = document.getElementById('rosterTableBody');
+  if (!tbody) return;
+  const rows = Array.from({ length: 7 }, (_, index) => {
+    const shimmerWidth = 68 - index * 4;
+    return `
+      <tr class="roster-player-row hd-row roster-skeleton-row" aria-hidden="true">
+        <td class="player-name-hd pl-4">
+          <div class="skeleton-line" style="width:${Math.max(42, shimmerWidth)}%;height:14px;margin-bottom:8px"></div>
+          <div class="skeleton-line" style="width:58%;height:10px;opacity:.7"></div>
+        </td>
+        ${Array.from({ length: 19 }, () => `
+          <td class="roster-hd-cell">
+            <div class="skeleton-line" style="width:70%;height:12px;margin:0 auto"></div>
+          </td>`).join('')}
+      </tr>`;
+  }).join('');
+
+  tbody.innerHTML = rows;
+}
+
 function renderMatchupHero(game, prediction) {
   const container = document.getElementById('matchupHeroContainer');
   if (!container) return;
@@ -847,6 +1177,11 @@ async function renderSchedule() {
   const recentList = document.getElementById('recentGamesList');
   const streakBadge = document.getElementById('schedStreakBadge');
   const displayGames = pastGames.slice(0, 5);
+
+  if (SCHEDULE_LOADING && (!RECENT_GAMES || RECENT_GAMES.length === 0)) {
+    renderScheduleSkeleton();
+    return;
+  }
 
   if (!displayGames.length) {
     if (recentList) recentList.innerHTML = '<div class="no-data">No recent results</div>';
@@ -965,7 +1300,7 @@ async function renderSchedule() {
     }).join('');
   }
 
-  await loadPredictionsForGames(upcomingGames);
+  void loadPredictionsForGames(upcomingGames).catch(() => null);
 
   if (upcomingGames.length > 0) {
     const nextKey = `${upcomingGames[0].home}_${upcomingGames[0].away}`;
@@ -980,6 +1315,60 @@ async function renderSchedule() {
     l10El.textContent = l10;
     const [w] = l10.split('-').map(Number);
     l10El.style.color = w >= 7 ? 'var(--lime)' : w <= 3 ? 'var(--blue)' : '';
+  }
+}
+
+function renderScheduleSkeleton() {
+  const stripEl = document.getElementById('schedRecordStrip');
+  const recentList = document.getElementById('recentGamesList');
+  const upcomingContainer = document.getElementById('upcomingGamesCards');
+  const matchupHero = document.getElementById('matchupHeroContainer');
+
+  if (stripEl) {
+    stripEl.innerHTML = `
+      <div class="sr-stat"><div class="skeleton-line" style="width:64px;height:24px;margin-bottom:8px"></div><div class="skeleton-line" style="width:42px;height:10px"></div></div>
+      <div class="sr-stat"><div class="skeleton-line" style="width:52px;height:24px;margin-bottom:8px"></div><div class="skeleton-line" style="width:36px;height:10px"></div></div>
+      <div class="sr-stat"><div class="skeleton-line" style="width:52px;height:24px;margin-bottom:8px"></div><div class="skeleton-line" style="width:34px;height:10px"></div></div>
+      <div class="sr-stat"><div class="skeleton-line" style="width:52px;height:24px;margin-bottom:8px"></div><div class="skeleton-line" style="width:34px;height:10px"></div></div>
+      <div class="sr-l10"><div class="skeleton-line" style="width:22px;height:10px;margin-bottom:10px"></div><div style="display:flex;gap:4px">${Array.from({ length: 10 }, () => '<span class="skeleton-line" style="width:10px;height:18px;display:inline-block"></span>').join('')}</div></div>`;
+  }
+
+  if (recentList) {
+    recentList.innerHTML = Array.from({ length: 5 }, (_, index) => `
+      <div class="sg-card sg-skeleton" style="animation-delay:${index * 0.05}s">
+        <div class="sg-left">
+          <span class="skeleton-line" style="width:22px;height:22px;border-radius:999px"></span>
+          <div class="sg-info" style="flex:1">
+            <div class="skeleton-line" style="width:88px;height:12px;margin-bottom:8px"></div>
+            <div class="skeleton-line" style="width:120px;height:10px"></div>
+          </div>
+        </div>
+        <div class="sg-right" style="min-width:160px">
+          <div class="skeleton-line" style="width:72px;height:20px;margin-left:auto;margin-bottom:10px"></div>
+          <div class="skeleton-line" style="width:100%;height:8px"></div>
+        </div>
+      </div>`).join('');
+  }
+
+  if (upcomingContainer) {
+    upcomingContainer.innerHTML = Array.from({ length: 4 }, () => `
+      <div class="upcoming-card upcoming-skeleton">
+        <div class="skeleton-line" style="width:62px;height:10px;margin-bottom:14px"></div>
+        <div class="skeleton-line" style="width:100px;height:14px;margin-bottom:14px"></div>
+        <div class="skeleton-line" style="width:54px;height:12px;margin-bottom:18px"></div>
+        <div class="skeleton-line" style="width:76px;height:12px"></div>
+      </div>`).join('');
+  }
+
+  if (matchupHero) {
+    matchupHero.innerHTML = `
+      <div class="next-game-strip next-game-skeleton">
+        <div class="skeleton-line" style="width:78px;height:10px;margin-bottom:14px"></div>
+        <div class="skeleton-line" style="width:180px;height:22px;margin-bottom:14px"></div>
+        <div class="skeleton-line" style="width:128px;height:12px;margin-bottom:18px"></div>
+        <div class="skeleton-line" style="width:92px;height:10px;margin-bottom:8px"></div>
+        <div class="skeleton-line" style="width:100%;height:8px"></div>
+      </div>`;
   }
 }
 
@@ -1068,6 +1457,7 @@ function normalizeRosterPlayer(player) {
   const fullName = player?.name ?? player?.fullName ?? player?.full_name ?? `${firstName} ${lastName}`.trim();
   return {
     name: fullName || 'Unknown',
+    position: String(player?.position ?? player?.pos ?? player?.POSITION ?? '').trim(),
     pts: normalizeNumericStat(player?.pts ?? player?.PTS ?? player?.points ?? player?.PPG),
     reb: normalizeNumericStat(player?.reb ?? player?.REB ?? player?.rebounds ?? player?.RPG),
     ast: normalizeNumericStat(player?.ast ?? player?.AST ?? player?.assists ?? player?.APG),
@@ -1653,7 +2043,16 @@ function renderInjuryTicker() {
 function renderScoutReport() {
   const body = document.getElementById('scoutBody');
   const tags = document.getElementById('scoutTags');
-  if (!body || !TEAM_DATA) return;
+  if (!body) return;
+  // Show skeleton until authoritative team stats are merged
+  const hasLiveMetrics = TEAM_DATA && (TEAM_DATA.ortg !== undefined || TEAM_DATA.elo !== undefined || (TEAM_DATA.fourFactors && TEAM_DATA.fourFactors.efg !== undefined));
+  if (!TEAM_DATA || !hasLiveMetrics) {
+    body.innerHTML = `<div class="skeleton-line" style="width:90%;margin-bottom:8px"></div>
+      <div class="skeleton-line" style="width:75%;margin-bottom:8px"></div>
+      <div class="skeleton-line" style="width:82%"></div>`;
+    tags.innerHTML = '';
+    return;
+  }
 
   const name = TEAM_DATA.name || TEAM_ABBR;
   const conf = TEAM_DATA.conference === 'E' ? 'East' : 'West';
@@ -1726,7 +2125,17 @@ function renderScoutReport() {
 // ─── FOUR FACTORS ────────────────────────────────────────────────────────────
 function renderFourFactors() {
   const grid = document.getElementById('fourFactorsGrid');
-  if (!grid || !TEAM_DATA) return;
+  if (!grid) return;
+  // Require authoritative four-factor metrics (provided by team_stats) before showing values
+  const hasFourFactors = TEAM_DATA && TEAM_DATA.fourFactors && (TEAM_DATA.fourFactors.efg !== undefined || TEAM_DATA.fourFactors.tov !== undefined);
+  if (!hasFourFactors) {
+    grid.innerHTML = `
+      <div class="ff-row"><div class="skeleton-line" style="height:18px;width:40%;margin-bottom:8px"></div><div class="skeleton-line" style="height:12px;width:50%"></div></div>
+      <div class="ff-row"><div class="skeleton-line" style="height:18px;width:40%;margin-bottom:8px"></div><div class="skeleton-line" style="height:12px;width:50%"></div></div>
+      <div class="ff-row"><div class="skeleton-line" style="height:18px;width:40%;margin-bottom:8px"></div><div class="skeleton-line" style="height:12px;width:50%"></div></div>
+      <div class="ff-row"><div class="skeleton-line" style="height:18px;width:40%;margin-bottom:8px"></div><div class="skeleton-line" style="height:12px;width:50%"></div></div>`;
+    return;
+  }
 
   // Derive heuristic Four Factors from available team data
   // League averages (2024-25 season approximations)
@@ -2190,36 +2599,45 @@ async function renderLineupData() {
   const starterNet = net + 2.7;
   const benchNet = net + 0.6;
 
+  const fallbackCombos = [
+    { players: `${top[0] || 'Lead Guard'} + ${top[1] || 'Wing'}`, min: 342, netRtg: net + 7.8, ppp: 1.18 },
+    { players: `${top[0] || 'Lead Guard'} + ${top[2] || 'Big'}`, min: 228, netRtg: net + 4.0, ppp: 1.09 },
+    { players: `${top[1] || 'Wing'} + ${top[3] || 'Forward'}`, min: 195, netRtg: net + 1.6, ppp: 1.11 },
+    { players: `${top[2] || 'Big'} + ${top[4] || 'Guard'}`, min: 150, netRtg: net - 1.4, ppp: 1.01 },
+    { players: `${top[0] || 'Lead Guard'} + ${top[4] || 'Guard'} + ${top[1] || 'Wing'}`, min: 126, netRtg: net + 2.1, ppp: 1.07 },
+  ];
+
+  if (!LINEUP_COMBOS.length) {
+    LINEUP_COMBOS = fallbackCombos;
+  }
+
+  const renderHeader = () => {
+    const sortedBest = [...LINEUP_COMBOS].sort((a, b) => b.netRtg - a.netRtg);
+    const best = sortedBest[0];
+    const worst = sortedBest[sortedBest.length - 1];
+
+    if (bestLineupCombo) bestLineupCombo.textContent = best?.players || 'No lineup sample';
+    if (worstLineupCombo) worstLineupCombo.textContent = worst?.players || 'No lineup sample';
+    if (document.getElementById('bestLineupNetRtg')) document.getElementById('bestLineupNetRtg').textContent = best ? `${best.netRtg > 0 ? '+' : ''}${best.netRtg.toFixed(1)}` : '—';
+    if (document.getElementById('worstLineupNetRtg')) document.getElementById('worstLineupNetRtg').textContent = worst ? `${worst.netRtg > 0 ? '+' : ''}${worst.netRtg.toFixed(1)}` : '—';
+    if (document.getElementById('startersNetRtg')) document.getElementById('startersNetRtg').textContent = `${starterNet > 0 ? '+' : ''}${starterNet.toFixed(1)}`;
+    if (document.getElementById('benchNetRtg')) document.getElementById('benchNetRtg').textContent = `${benchNet > 0 ? '+' : ''}${benchNet.toFixed(1)}`;
+
+    renderLineupCombosTable();
+    bindTradeSimulator();
+  };
+
+  renderHeader();
+
   try {
     const data = await workerFetch(`/api/lineups?team=${encodeURIComponent(TEAM_ABBR)}`, 20000, 0);
     if (data && Array.isArray(data.combos) && data.combos.length > 0) {
       LINEUP_COMBOS = data.combos;
-    } else {
-      throw new Error('No lineup data');
+      renderHeader();
     }
   } catch (e) {
-    LINEUP_COMBOS = [
-      { players: `${top[0] || 'Lead Guard'} + ${top[1] || 'Wing'}`, min: 342, netRtg: net + 7.8, ppp: 1.18 },
-      { players: `${top[0] || 'Lead Guard'} + ${top[2] || 'Big'}`, min: 228, netRtg: net + 4.0, ppp: 1.09 },
-      { players: `${top[1] || 'Wing'} + ${top[3] || 'Forward'}`, min: 195, netRtg: net + 1.6, ppp: 1.11 },
-      { players: `${top[2] || 'Big'} + ${top[4] || 'Guard'}`, min: 150, netRtg: net - 1.4, ppp: 1.01 },
-      { players: `${top[0] || 'Lead Guard'} + ${top[4] || 'Guard'} + ${top[1] || 'Wing'}`, min: 126, netRtg: net + 2.1, ppp: 1.07 },
-    ];
+    // keep cached/fallback lineup preview
   }
-
-  const sortedBest = [...LINEUP_COMBOS].sort((a, b) => b.netRtg - a.netRtg);
-  const best = sortedBest[0];
-  const worst = sortedBest[sortedBest.length - 1];
-
-  if (bestLineupCombo) bestLineupCombo.textContent = best?.players || 'No lineup sample';
-  if (worstLineupCombo) worstLineupCombo.textContent = worst?.players || 'No lineup sample';
-  if (document.getElementById('bestLineupNetRtg')) document.getElementById('bestLineupNetRtg').textContent = best ? `${best.netRtg > 0 ? '+' : ''}${best.netRtg.toFixed(1)}` : '—';
-  if (document.getElementById('worstLineupNetRtg')) document.getElementById('worstLineupNetRtg').textContent = worst ? `${worst.netRtg > 0 ? '+' : ''}${worst.netRtg.toFixed(1)}` : '—';
-  if (document.getElementById('startersNetRtg')) document.getElementById('startersNetRtg').textContent = `${starterNet > 0 ? '+' : ''}${starterNet.toFixed(1)}`;
-  if (document.getElementById('benchNetRtg')) document.getElementById('benchNetRtg').textContent = `${benchNet > 0 ? '+' : ''}${benchNet.toFixed(1)}`;
-
-  renderLineupCombosTable();
-  bindTradeSimulator();
 }
 
 function renderTeamAdvancedMetrics() {

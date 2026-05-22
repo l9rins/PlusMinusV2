@@ -26,7 +26,7 @@
   padding: 10px;
   background: linear-gradient(180deg, rgba(255, 255, 255, .01), rgba(255, 255, 255, .005));
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 0;
   align-items: center;
 }
 
@@ -3595,7 +3595,7 @@
   font-size: 11px;
   font-weight: 700;
   padding: 2px 6px;
-  border-radius: 2px;
+  border-radius: 0;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
@@ -3646,14 +3646,14 @@
   background: var(--lime);
   color: #000;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 0;
   font-style: normal;
 }
 
 .season-health-timeline {
   height: 6px;
   background: rgba(255, 255, 255, .1);
-  border-radius: 3px;
+  border-radius: 0;
   margin-top: 4px;
   position: relative;
 }
@@ -3679,7 +3679,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, .05);
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .next-game-info {
@@ -3701,7 +3701,7 @@
   color: var(--muted);
   background: rgba(255, 255, 255, .1);
   padding: 2px 6px;
-  border-radius: 2px;
+  border-radius: 0;
   display: inline-block;
   width: fit-content;
 }
@@ -3725,7 +3725,7 @@
 .injury-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .injury-dot.out {
@@ -3798,7 +3798,7 @@
 .mini-win-bar {
   height: 4px;
   background: var(--coral);
-  border-radius: 2px;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -3821,7 +3821,7 @@
   font-size: 10px;
   font-weight: 700;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 0;
   letter-spacing: 0.5px;
 }
 
@@ -3847,14 +3847,14 @@
 .percentile-bar {
   height: 4px;
   background: rgba(255, 255, 255, .1);
-  border-radius: 2px;
+  border-radius: 0;
   position: relative;
   margin-bottom: 4px;
 }
 
 .percentile-fill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .percentile-fill.lime {
@@ -3872,7 +3872,7 @@
 .percentile-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 0;
   position: absolute;
   top: -2px;
   margin-left: -4px;
@@ -3997,7 +3997,7 @@
 .player-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4012,7 +4012,7 @@
   margin-top: 8px;
   height: 8px;
   background: rgba(255, 255, 255, .03);
-  border-radius: 4px;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -4043,7 +4043,7 @@
   display: inline-block;
   height: 8px;
   background: rgba(255, 255, 255, .06);
-  border-radius: 4px;
+  border-radius: 0;
   position: relative;
   vertical-align: middle;
   margin-right: 6px;
@@ -4070,7 +4070,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 0;
   background: linear-gradient(180deg, rgba(255, 255, 255, .01), transparent);
   border: 1px solid rgba(255, 255, 255, .03);
 }
@@ -4085,7 +4085,7 @@
 .opp-logo {
   width: 36px;
   height: 36px;
-  border-radius: 6px;
+  border-radius: 0;
   background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02));
   display: inline-flex;
   align-items: center;
@@ -4137,7 +4137,7 @@
 
 .result-pill {
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: 0;
   font-family: var(--mono);
   font-weight: 800;
   font-size: 12px;
@@ -4159,7 +4159,7 @@
 
 .point-chip {
   padding: 4px 6px;
-  border-radius: 12px;
+  border-radius: 0;
   font-family: var(--mono);
   font-weight: 800;
   background: rgba(255, 255, 255, .03);
@@ -4228,7 +4228,7 @@
 .injury-pill-dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--blue);
   flex-shrink: 0;
   box-shadow: 0 0 6px rgba(60, 174, 255, .6);

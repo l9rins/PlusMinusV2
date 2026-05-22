@@ -13,16 +13,17 @@ import os
 import time
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fastapi.responses import StreamingResponse, JSONResponse
 
 load_dotenv()
 
@@ -35,6 +36,21 @@ NBA_TIME_ZONE = ZoneInfo("America/New_York")
 def _nba_date_compact() -> str:
     """Return the NBA operational date in Eastern Time, formatted YYYYMMDD."""
     return datetime.now(NBA_TIME_ZONE).strftime("%Y%m%d")
+
+
+def _compact_date_key(value: str | None) -> str:
+    """Normalize YYYY-MM-DD / YYYYMMDD / ISO datetime strings to YYYYMMDD."""
+    if not value or not isinstance(value, str):
+        return _nba_date_compact()
+    candidate = value.strip()
+    if len(candidate) == 8 and candidate.isdigit():
+        return candidate
+    if len(candidate) == 10 and candidate[4] == '-' and candidate[7] == '-':
+        return candidate.replace('-', '')
+    try:
+        return datetime.fromisoformat(candidate.replace('Z', '+00:00')).astimezone(NBA_TIME_ZONE).strftime("%Y%m%d")
+    except Exception:
+        return _nba_date_compact()
 
 
 def normalize_team_abbr(t: str) -> str:
@@ -76,7 +92,10 @@ _startup_error = None
 
 def _build_fallback_elo():
     """Create an initialized ELO system so predictions can run in fallback mode."""
-    from features import NBAELO
+    try:
+        from apps.api.features import NBAELO
+    except ImportError:
+        from features import NBAELO
     from nba_api.stats.static import teams as nba_teams
 
     elo = NBAELO()
@@ -135,8 +154,12 @@ def _load_team_stats():
     """Load recent seasons for rolling stats + ELO. Called once at startup."""
     global _team_stats, _elo_system, _featured_df
 
-    from data_loader import load_seasons, clean
-    from features import build_full_features, build_rolling_stats
+    try:
+        from apps.api.data_loader import load_seasons, clean
+        from apps.api.features import build_full_features, build_rolling_stats
+    except ImportError:
+        from data_loader import load_seasons, clean
+        from features import build_full_features, build_rolling_stats
 
     now = datetime.utcnow()
     current_start_year = now.year if now.month >= 10 else now.year - 1
@@ -171,6 +194,7 @@ CACHE_TTL_INJURIES = int(os.getenv("CACHE_TTL_INJURIES", "300"))     # 5 minutes
 CACHE_TTL_SHOT_ZONES = int(os.getenv("CACHE_TTL_SHOT_ZONES", "60"))   # 1 minute default
 CACHE_TTL_LINEUPS = int(os.getenv("CACHE_TTL_LINEUPS", "120"))        # 2 minutes default
 CACHE_TTL_PLAY_TYPES = int(os.getenv("CACHE_TTL_PLAY_TYPES", "300"))  # 5 minutes default
+CACHE_TTL_SCHEDULE = int(os.getenv("CACHE_TTL_SCHEDULE", "300"))      # 5 minutes default
 
 # CORS — allow the Cloudflare Worker and local dev
 _allowed_origins = [
@@ -178,6 +202,10 @@ _allowed_origins = [
     for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:8080,http://127.0.0.1:5500").split(",")
     if o.strip()
 ]
+
+# Debug toggle: allow-all CORS when DEBUG_ALLOW_ALL_CORS=1 (safe for local development only)
+if os.getenv("DEBUG_ALLOW_ALL_CORS", "0") == "1":
+    _allowed_origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -218,9 +246,9 @@ def _get_team_form(team: str, is_home: bool) -> dict:
 
 # New utility: expose player game logs for frontend or debugging
 try:
-    from apps.api.nba_source import fetch_player_game_log, fetch_team_top_players
+    from apps.api.nba_source import fetch_player_game_log, fetch_team_top_players, fetch_full_roster
 except ImportError:
-    from nba_source import fetch_player_game_log, fetch_team_top_players
+    from nba_source import fetch_player_game_log, fetch_team_top_players, fetch_full_roster
 try:
     from apps.api.injuries import fetch_injuries, get_injury_impact
 except ImportError:
@@ -230,6 +258,46 @@ try:
     from apps.api.play_types import fetch_play_types_for_team
 except ImportError:
     fetch_play_types_for_team = None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REALTIME BROADCASTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+_broadcaster = {}
+
+
+def _ensure_team_channel(team: str):
+    t = normalize_team_abbr(team)
+    if t not in _broadcaster:
+        _broadcaster[t] = {'sse': set(), 'ws': set()}
+    return _broadcaster[t]
+
+
+async def _broadcast_team_event(team: str, event_type: str, data: dict | None = None):
+    t = normalize_team_abbr(team)
+    if not t:
+        return
+
+    chan = _ensure_team_channel(t)
+    payload = {"type": event_type, "team": t, "data": data or {}}
+    import json
+    serialized = json.dumps(payload)
+
+    for queue in list(chan['sse']):
+        try:
+            queue.put_nowait(serialized)
+        except Exception:
+            pass
+
+    for websocket in list(chan['ws']):
+        try:
+            await websocket.send_text(serialized)
+        except Exception:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
 
 
 @app.get("/api/team_stats")
@@ -248,7 +316,7 @@ async def team_stats(team: str = Query(..., description="Team abbreviation e.g. 
             if _elo_system and t in _elo_system.ratings:
                 elo_val = _elo_system.ratings[t]
                 
-            return {
+            resp = {
                 "team": t,
                 "elo": round(elo_val),
                 "ortg": 112.0,
@@ -269,6 +337,8 @@ async def team_stats(team: str = Query(..., description="Team abbreviation e.g. 
                     "ts": 56.5
                 }
             }
+            await _broadcast_team_event(t, 'team_stats_refresh', {"source": "team_stats", "cached": False, "team": t, "team_stats": resp})
+            return resp
         
         td = _team_stats[t]
         if td.empty:
@@ -321,7 +391,7 @@ async def team_stats(team: str = Query(..., description="Team abbreviation e.g. 
         net_pct = get_percentile(net_rtg, all_net, invert=False)
         pace_pct = get_percentile(pace, all_pace, invert=False)
         
-        return {
+        resp = {
             "team": t,
             "elo": round(elo_val),
             "ortg": round(ortg, 2),
@@ -342,6 +412,8 @@ async def team_stats(team: str = Query(..., description="Team abbreviation e.g. 
                 "ts": round(ts, 2)
             }
         }
+        await _broadcast_team_event(t, 'team_stats_refresh', {"source": "team_stats", "cached": False, "team": t, "team_stats": resp})
+        return resp
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -379,6 +451,18 @@ async def team_top_players(team: str = Query(..., description="Team abbreviation
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/full_roster")
+async def full_roster(team: str = Query(..., description="Team abbreviation e.g. BOS"), fresh: bool = Query(False, description="Bypass in-memory roster cache")):
+    """Return the full active roster for a team, including positions."""
+    try:
+        t = normalize_team_abbr(team)
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, fetch_full_roster, t, None, fresh)
+        return {"team": t, "players": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/injuries")
 async def api_injuries(team: str | None = Query(None, description="Optional team abbreviation to filter")):
     """Return current injury feed (cached) or a single team's injury impact."""
@@ -392,18 +476,26 @@ async def api_injuries(team: str | None = Query(None, description="Optional team
         cached = api_injuries._cache
 
         # Fetch or use cached injuries
+        refreshed = False
         if now - cached["ts"] < CACHE_TTL_INJURIES and cached["data"] is not None:
             injuries = cached["data"]
         else:
             injuries = await loop.run_in_executor(None, fetch_injuries)
             cached["data"] = injuries
             cached["ts"] = now
+            refreshed = True
 
         if team:
             team_up = normalize_team_abbr(team)
             impact = await loop.run_in_executor(None, get_injury_impact, team_up, injuries)
-            return {"team": team_up, "injuries": injuries.get(team_up, []), "impact": impact}
-        return {"injuries": injuries}
+            resp = {"team": team_up, "injuries": injuries.get(team_up, []), "impact": impact}
+            if refreshed:
+                await _broadcast_team_event(team_up, 'injury_refresh', resp)
+            return resp
+        resp = {"injuries": injuries}
+        if refreshed:
+            await _broadcast_team_event('all', 'injury_refresh', resp)
+        return resp
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -450,6 +542,7 @@ async def api_shot_zones(team: str = Query(..., description="Team abbreviation e
             resp = {"team": t, "source": "heuristic_team_stats", "zones": zones}
             cached["data"][t] = resp
             cached["ts"] = now
+            await _broadcast_team_event(t, 'shot_zones_refresh', resp)
             return resp
 
         # fallback defaults
@@ -457,6 +550,7 @@ async def api_shot_zones(team: str = Query(..., description="Team abbreviation e
         resp = {"team": t, "source": "fallback", "zones": zones}
         cached["data"][t] = resp
         cached["ts"] = now
+        await _broadcast_team_event(t, 'shot_zones_refresh', resp)
         return resp
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -555,6 +649,7 @@ async def api_lineups(team: str = Query(..., description="Team abbreviation e.g.
         resp = {"team": t, "combos": combos}
         cached["data"][key] = resp
         cached["ts"] = now
+        await _broadcast_team_event(t, 'lineups_refresh', {"team": t, "top_n": top_n, "combos": combos[:10]})
         return resp
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -594,6 +689,103 @@ async def api_play_types(team: str = Query(..., description="Team abbreviation e
         resp = {"team": t, "play_types": data, "source": "heuristic_rolling_stats"}
         cached["data"][t] = resp
         cached["ts"] = now
+        await _broadcast_team_event(t, 'play_types_refresh', resp)
+        return resp
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/schedule")
+async def api_schedule(
+    days: int = Query(14, ge=1, le=31, description="Number of days to fetch"),
+    date: str | None = Query(None, description="Anchor date in YYYY-MM-DD, YYYYMMDD, or ISO datetime"),
+):
+    """Return an ESPN-backed schedule map for the requested date range.
+
+    The response shape matches the frontend's expected `{ schedule: { YYYY-MM-DD: [...] } }`.
+    """
+    try:
+        if not hasattr(api_schedule, "_cache"):
+            api_schedule._cache = {"ts": 0, "data": {}}
+        now = time.time()
+        cached = api_schedule._cache
+        anchor_key = _compact_date_key(date)
+        cache_key = f"{anchor_key}:{days}"
+        if now - cached["ts"] < CACHE_TTL_SCHEDULE and cache_key in cached["data"]:
+            return cached["data"][cache_key]
+
+        import requests
+
+        start_dt = datetime.strptime(anchor_key, "%Y%m%d")
+        schedule = {}
+
+        for offset in range(days):
+            current_dt = start_dt + timedelta(days=offset)
+            date_key = current_dt.strftime("%Y-%m-%d")
+            compact = current_dt.strftime("%Y%m%d")
+            day_games = []
+
+            try:
+                resp = requests.get(
+                    f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={compact}",
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=8,
+                )
+                resp.raise_for_status()
+                events = resp.json().get("events", [])
+            except Exception as exc:
+                print(f"  [Schedule] ESPN fetch failed for {date_key}: {exc}")
+                events = []
+
+            for ev in events:
+                comp = ev.get("competitions", [{}])[0]
+                competitors = comp.get("competitors", [])
+                home_c = next((c for c in competitors if c.get("homeAway") == "home"), None)
+                away_c = next((c for c in competitors if c.get("homeAway") == "away"), None)
+                if not home_c or not away_c:
+                    continue
+
+                state = ev.get("status", {}).get("type", {}).get("state", "pre")
+                home_score = int(float(home_c.get("score") or 0))
+                away_score = int(float(away_c.get("score") or 0))
+                if state == "post":
+                    status = 3
+                elif state == "in":
+                    status = 2
+                else:
+                    status = 1
+
+                day_games.append({
+                    "home": home_c["team"]["abbreviation"],
+                    "away": away_c["team"]["abbreviation"],
+                    "date": date_key,
+                    "startTime": ev.get("date", ""),
+                    "status": status,
+                    "homeScore": home_score,
+                    "awayScore": away_score,
+                    "arena": comp.get("venue", {}).get("fullName", ""),
+                    "tv": ev.get("broadcasts", [{}])[0].get("names", [""])[0] if ev.get("broadcasts") else "",
+                    "result": f"{home_c['team']['abbreviation']} W" if home_score > away_score else f"{home_c['team']['abbreviation']} L" if state == "post" else None,
+                })
+
+            schedule[date_key] = day_games
+
+        resp = {
+            "date": anchor_key,
+            "days": days,
+            "timezone": "America/New_York",
+            "schedule": schedule,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        cached["data"][cache_key] = resp
+        cached["ts"] = now
+
+        for team_key in list(_broadcaster.keys()):
+            try:
+                await _broadcast_team_event(team_key, 'schedule_refresh', {"date": anchor_key, "days": days})
+            except Exception:
+                pass
+
         return resp
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -643,7 +835,10 @@ async def predict(
 
     loop = asyncio.get_event_loop()
 
-    from injuries import fetch_injuries, get_injury_impact
+    try:
+        from apps.api.injuries import fetch_injuries, get_injury_impact
+    except ImportError:
+        from injuries import fetch_injuries, get_injury_impact
     injuries = await loop.run_in_executor(None, fetch_injuries)
     home_injuries = get_injury_impact(home, injuries)
     away_injuries = get_injury_impact(away, injuries)
@@ -659,7 +854,10 @@ async def predict(
     }
 
     # 3. Groq analysis
-    from groq_analysis import analyze_matchup
+    try:
+        from apps.api.groq_analysis import analyze_matchup
+    except ImportError:
+        from groq_analysis import analyze_matchup
     groq_result = await loop.run_in_executor(
         None, analyze_matchup, home, away, ml_probs, home_form, away_form, home_injuries, away_injuries
     )
@@ -668,8 +866,14 @@ async def predict(
     poly_probs = None
     poly_divergence = None
     if include_polymarket:
-        from polymarket import get_market_for_game
-        from groq_analysis import analyze_divergence
+        try:
+            from apps.api.polymarket import get_market_for_game
+        except ImportError:
+            from polymarket import get_market_for_game
+        try:
+            from apps.api.groq_analysis import analyze_divergence
+        except ImportError:
+            from groq_analysis import analyze_divergence
 
         poly_probs = await loop.run_in_executor(None, get_market_for_game, home, away)
         if poly_probs and abs(ml_probs["home_win"] - poly_probs["home_win"]) > 0.05:
@@ -888,3 +1092,95 @@ async def chat(req: ChatRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
+@app.get("/events")
+async def events(request: Request, team: str = Query(..., description="Team abbreviation")):
+    """Server-Sent Events endpoint for simple realtime dev updates.
+
+    Clients should connect with EventSource to `/events?team=OKC`.
+    """
+    t = normalize_team_abbr(team)
+    chan = _ensure_team_channel(t)
+
+    queue: asyncio.Queue = asyncio.Queue()
+    chan['sse'].add(queue)
+
+    async def event_generator():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    # keep-alive comment
+                    yield ': keep-alive\n\n'
+                    continue
+                data = f"data: {payload}\n\n"
+                yield data
+        finally:
+            try:
+                chan['sse'].discard(queue)
+            except Exception:
+                pass
+
+    return StreamingResponse(event_generator(), media_type='text/event-stream')
+
+
+@app.websocket('/ws')
+async def websocket_endpoint(websocket: WebSocket, team: str = Query(...)):
+    await websocket.accept()
+    t = normalize_team_abbr(team)
+    chan = _ensure_team_channel(t)
+    chan['ws'].add(websocket)
+    try:
+        while True:
+            try:
+                msg = await websocket.receive_text()
+                await websocket.send_text('{"ok": true}')
+            except WebSocketDisconnect:
+                break
+            except Exception:
+                await asyncio.sleep(0.1)
+    finally:
+        try:
+            chan['ws'].discard(websocket)
+        except Exception:
+            pass
+
+
+class EmitPayload(BaseModel):
+    team: str
+    type: str = 'team_update'
+    data: dict | None = None
+
+
+@app.post('/api/emit')
+async def api_emit(payload: EmitPayload):
+    """Emit an event to connected SSE/WebSocket clients for a team (dev helper).
+
+    POST JSON: { "team": "OKC", "type": "team_update", "data": { ... } }
+    """
+    t = normalize_team_abbr(payload.team)
+    chan = _ensure_team_channel(t)
+    msg = {"type": payload.type, "team": t, "data": payload.data or {}}
+    import json
+    s = json.dumps(msg)
+
+    # push to SSE queues
+    for q in list(chan['sse']):
+        try:
+            q.put_nowait(s)
+        except Exception:
+            pass
+
+    # push to websockets
+    for ws in list(chan['ws']):
+        try:
+            await ws.send_text(s)
+        except Exception:
+            try:
+                await ws.close()
+            except Exception:
+                pass
+
+    return JSONResponse({"ok": True, "sent": True, "team": t, "type": payload.type})

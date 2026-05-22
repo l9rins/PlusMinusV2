@@ -278,13 +278,27 @@ def fetch_team_top_players(team_abbr: str, n: int = 3, season_year: Optional[int
     roster = fetch_team_roster(team_abbr, season_year)
     results = []
     for p in roster:
-        pid = p.get('personId') or p.get('personId') or p.get('personId')
+        pid = p.get('personId') or p.get('playerId') or p.get('PLAYER_ID') or p.get('person_id')
         try:
             pid = int(pid)
         except Exception:
+            pid = None
+
+        name = f"{p.get('firstName','').strip()} {p.get('lastName','').strip()}".strip()
+        if not name:
+            name = str(p.get('name') or p.get('PLAYER') or p.get('fullName') or p.get('full_name') or '').strip()
+        if not name:
             continue
+
+        base_row = {'player_id': pid or 0, 'name': name, 'pts': 0.0, 'ast': 0.0, 'reb': 0.0, 'games': 0}
+
+        if pid is None or pid <= 0:
+            results.append(base_row)
+            continue
+
         rows = fetch_player_game_log(pid)
         if not rows:
+            results.append(base_row)
             continue
         last = rows[:5]
         # normalize keys may be strings; use get safely
@@ -306,10 +320,189 @@ def fetch_team_top_players(team_abbr: str, n: int = 3, season_year: Optional[int
         pts = _sum('PTS')
         ast = _sum('AST')
         reb = _sum('REB')
-        name = f"{p.get('firstName','').strip()} {p.get('lastName','').strip()}".strip()
         results.append({'player_id': pid, 'name': name, 'pts': pts, 'ast': ast, 'reb': reb, 'games': len(last)})
 
     # sort by pts desc as crude importance, return top n
-    results = sorted(results, key=lambda x: -x['pts'])
+    results = sorted(results, key=lambda x: (-x['games'], -x['pts'], x['name']))
     return results[:n]
 
+
+def fetch_full_roster(team_abbr: str, season_year: Optional[int] = None, fresh: bool = False) -> List[Dict[str, Any]]:
+    """Return the complete active roster for a team with per-player recent stats.
+
+    Unlike fetch_team_top_players (which returns top-N), this returns ALL players
+    on the roster, each enriched with last-5-game averages for PTS, REB, AST, MIN.
+    Designed for the team page Active Roster table.
+    """
+    key = f"full_roster:{team_abbr}:{season_year or 'auto'}"
+    if not fresh:
+        cached = _cached(key)
+        if cached is not None:
+            return cached
+
+    roster = fetch_team_roster(team_abbr, season_year)
+    results = []
+    for p in roster:
+        pid = p.get('personId') or p.get('playerId') or p.get('PLAYER_ID') or p.get('person_id')
+        try:
+            pid = int(pid)
+        except Exception:
+            pid = None
+
+        name = f"{p.get('firstName','').strip()} {p.get('lastName','').strip()}".strip()
+        if not name:
+            name = str(p.get('name') or p.get('PLAYER') or p.get('fullName') or p.get('full_name') or '').strip()
+        if not name:
+            continue
+
+        position = str(p.get('position') or p.get('pos') or p.get('POSITION') or '').strip()
+        number = str(p.get('number') or p.get('jersey') or p.get('NUM') or p.get('JERSEY') or '').strip()
+
+        base_row = {
+            'player_id': pid or 0,
+            'name': name,
+            'position': position,
+            'number': number,
+            'pts': 0.0, 'ast': 0.0, 'reb': 0.0, 'min': 0.0,
+            'games': 0,
+            'fg_pct': 0.0, 'fg3_pct': 0.0, 'ft_pct': 0.0,
+            'stl': 0.0, 'blk': 0.0, 'tov': 0.0,
+        }
+
+        if pid is None or pid <= 0:
+            results.append(base_row)
+            continue
+
+        rows = fetch_player_game_log(pid)
+        if not rows:
+            results.append(base_row)
+            continue
+        last = rows[:5]
+
+        def _avg(k):
+            s, c = 0.0, 0
+            for r in last:
+                v = r.get(k) if isinstance(r, dict) else None
+                if v is None:
+                    try:
+                        v = float(r.get(k, 0))
+                    except Exception:
+                        v = 0
+                s += float(v or 0)
+                c += 1
+            return round(s / c, 1) if c else 0.0
+
+        def _parse_min(r):
+            m = r.get('MIN') or r.get('MINUTES') or r.get('min') or None
+            if m is None:
+                return 0.0
+            try:
+                return float(str(m).replace(':', '.'))
+            except Exception:
+                return 0.0
+
+        avg_min = round(sum(_parse_min(r) for r in last) / len(last), 1) if last else 0.0
+
+        results.append({
+            'player_id': pid,
+            'name': name,
+            'position': position,
+            'number': number,
+            'pts': _avg('PTS'),
+            'ast': _avg('AST'),
+            'reb': _avg('REB'),
+            'stl': _avg('STL'),
+            'blk': _avg('BLK'),
+            'tov': _avg('TOV'),
+            'fg_pct': _avg('FG_PCT'),
+            'fg3_pct': _avg('FG3_PCT'),
+            'ft_pct': _avg('FT_PCT'),
+            'min': avg_min,
+            'games': len(last),
+        })
+
+    # Sort by minutes desc as proxy for importance
+    results = sorted(results, key=lambda x: (-x['min'], -x['pts'], x['name']))
+    if not fresh:
+        _set_cache(key, results)
+    return results
+
+
+def fetch_team_recent_games(team_abbr: str, count: int = 10) -> List[Dict[str, Any]]:
+    """Fetch the last N completed games for a team from ESPN scoreboard API.
+
+    Returns a list of game dicts with home/away abbreviations, scores, dates,
+    and win/loss results. This is the single-call replacement for the slow
+    frontend loop that fetches each date's scoreboard individually.
+    """
+    key = f"recent_games:{team_abbr}:{count}"
+    cached = _cached(key)
+    if cached is not None:
+        return cached
+
+    from datetime import timedelta
+
+    team_upper = team_abbr.upper()
+    games = []
+    today = datetime.utcnow()
+
+    # Scan backwards up to 60 days to find enough completed games
+    for day_offset in range(60):
+        if len(games) >= count:
+            break
+        dt = today - timedelta(days=day_offset + 1)
+        compact = dt.strftime('%Y%m%d')
+        date_key = dt.strftime('%Y-%m-%d')
+
+        try:
+            resp = requests.get(
+                f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={compact}",
+                headers={'User-Agent': 'Mozilla/5.0'},
+                timeout=8,
+            )
+            resp.raise_for_status()
+            events = resp.json().get('events', [])
+        except Exception:
+            continue
+
+        for ev in events:
+            comp = ev.get('competitions', [{}])[0]
+            competitors = comp.get('competitors', [])
+            home_c = next((c for c in competitors if c.get('homeAway') == 'home'), None)
+            away_c = next((c for c in competitors if c.get('homeAway') == 'away'), None)
+            if not home_c or not away_c:
+                continue
+
+            home_abbr = home_c['team']['abbreviation']
+            away_abbr = away_c['team']['abbreviation']
+
+            # Only include games involving our team
+            if home_abbr != team_upper and away_abbr != team_upper:
+                continue
+
+            state = ev.get('status', {}).get('type', {}).get('state', 'pre')
+            if state != 'post':
+                continue
+
+            home_score = int(float(home_c.get('score') or 0))
+            away_score = int(float(away_c.get('score') or 0))
+            home_won = home_score > away_score
+
+            games.append({
+                'home': home_abbr,
+                'away': away_abbr,
+                'date': date_key,
+                'startTime': ev.get('date', date_key),
+                'status': 3,
+                'homeScore': home_score,
+                'awayScore': away_score,
+                'result': f"{home_abbr} W" if home_won else f"{away_abbr} W",
+                'arena': comp.get('venue', {}).get('fullName', ''),
+            })
+
+        if len(games) >= count:
+            break
+
+    games = games[:count]
+    _set_cache(key, games)
+    return games

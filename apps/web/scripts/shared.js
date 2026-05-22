@@ -127,6 +127,16 @@ const PM_CLIENT_CACHE = (() => {
     }
   }
 
+  function peek(key) {
+    try {
+      const raw = localStorage.getItem(PREFIX + key);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
   /** Return age in seconds, or null if not cached */
   function age(key) {
     try {
@@ -139,8 +149,16 @@ const PM_CLIENT_CACHE = (() => {
     }
   }
 
-  return { set, get, age };
+  return { set, get, age, peek };
 })();
+
+function pmReadClientCache(key, ttlKey, allowExpired = false) {
+  const entry = allowExpired ? PM_CLIENT_CACHE.peek(key) : PM_CLIENT_CACHE.get(key, ttlKey);
+  if (!entry) return null;
+  return entry;
+}
+
+window.pmReadClientCache = pmReadClientCache;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DEBOUNCE / VISIBILITY HELPERS
@@ -183,6 +201,7 @@ async function workerFetch(path, timeoutMs = 9000, retries = 2) {
       const usesBackend = [
         '/api/predict',
         '/api/slate',
+        '/api/schedule',
         '/api/team_top_players',
         '/api/playerlog',
         '/api/shot_zones',
@@ -195,7 +214,10 @@ async function workerFetch(path, timeoutMs = 9000, retries = 2) {
       const fallbackBase = usesBackend && primaryBase === PM_LOCAL_BACKEND ? PM_WORKER : null;
 
       const fetchFromBase = async (baseUrl) => {
-        const res = await fetch(`${baseUrl}${path}`, { signal: controller.signal });
+        const res = await fetch(`${baseUrl}${path}`, {
+          signal: controller.signal,
+          cache: usesBackend ? 'no-store' : 'default',
+        });
         if (res.status === 429) {
           const wait = Math.min(Number(res.headers.get('Retry-After') || 2) * 1000, 8000);
           await new Promise(r => setTimeout(r, wait));
@@ -255,7 +277,7 @@ const _SWR_STALE_MS = {
   schedule:  30 * 60_000,     // 30 min
   meta:      12 * 3_600_000,  // 12 h
 };
-async function _staleWhileRevalidate({ cacheKey, ttlKey, workerPath, processResponse, logLabel }) {
+async function _staleWhileRevalidate({ cacheKey, ttlKey, workerPath, processResponse, logLabel, timeoutMs, retries }) {
   if (PM_IS_FILE) return null;
 
   const cached = PM_CLIENT_CACHE.get(cacheKey, ttlKey);
@@ -270,7 +292,7 @@ async function _staleWhileRevalidate({ cacheKey, ttlKey, workerPath, processResp
   // Stale or missing: fetch in background, return cached immediately if present
   const fetchPromise = (async () => {
     try {
-      const json = await workerFetch(workerPath);
+      const json = await workerFetch(workerPath, timeoutMs ?? 9000, retries ?? 2);
       const data = processResponse(json);
       if (data) {
         PM_CLIENT_CACHE.set(cacheKey, data);
@@ -450,7 +472,7 @@ async function fetchTodayKPIs() {
 // Fetch games from schedule (multi-day) and flatten to today + next 3 days
 async function fetchUpcomingGames() {
   try {
-    const schedule = await workerFetch('/api/schedule?days=4', 10000);
+    const schedule = await workerFetch('/api/schedule?days=4', 30000, 1);
     if (!schedule?.schedule) return [];
 
     const today = new Date();
@@ -743,11 +765,12 @@ window.fetchNBANews = fetchNBANews;
 
 async function fetchAdvancedTeamContext(team = 'OKC') {
   const t = String(team || 'OKC').trim().toUpperCase();
+  const freshnessToken = Date.now();
   const paths = {
-    shotZones: `/api/shot_zones?team=${encodeURIComponent(t)}`,
-    lineups: `/api/lineups?team=${encodeURIComponent(t)}&top_n=5`,
-    playTypes: `/api/play_types?team=${encodeURIComponent(t)}`,
-    injuries: `/api/injuries?team=${encodeURIComponent(t)}`,
+    shotZones: `/api/shot_zones?team=${encodeURIComponent(t)}&fresh=${freshnessToken}`,
+    lineups: `/api/lineups?team=${encodeURIComponent(t)}&top_n=5&fresh=${freshnessToken}`,
+    playTypes: `/api/play_types?team=${encodeURIComponent(t)}&fresh=${freshnessToken}`,
+    injuries: `/api/injuries?team=${encodeURIComponent(t)}&fresh=${freshnessToken}`,
   };
 
   const entries = await Promise.allSettled(

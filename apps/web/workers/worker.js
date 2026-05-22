@@ -167,6 +167,7 @@ export default {
       case '/api/scoreboard': response = await handleScoreboard(env); break;
       case '/api/schedule':   response = await handleSchedule(env, url); break;
       case '/api/team_top_players': response = await handleTeamTopPlayers(env, url); break;
+      case '/api/full_roster': response = await handleBackendDataProxy(env, url, '/api/full_roster', 20000); break;
       case '/api/shot_zones': response = await handleBackendDataProxy(env, url, '/api/shot_zones', 12000); break;
       case '/api/lineups':    response = await handleBackendDataProxy(env, url, '/api/lineups', 20000); break;
       case '/api/play_types': response = await handleBackendDataProxy(env, url, '/api/play_types', 12000); break;
@@ -1216,14 +1217,17 @@ async function handleSchedule(env, url) {
 async function handleTeamTopPlayers(env, url) {
   const team = String(url?.searchParams?.get('team') ?? '').trim().toUpperCase();
   const n = Math.max(1, Math.min(5, parseInt(url?.searchParams?.get('n') ?? '3', 10) || 3));
+  const forceFresh = ['1', 'true', 'yes'].includes(String(url?.searchParams?.get('fresh') ?? '').toLowerCase());
   if (!team) return new Response('Missing team', { status: 400, headers: CORS });
 
   const KV_KEY = `team_top_players_${team}_${n}`;
 
-  const { value: cached, metadata } = await kvGet(env, KV_KEY);
-  if (cached && Array.isArray(cached.players) && cached.players.length > 0) {
-    const ageMs = Date.now() - (metadata?.ts ?? 0);
-    return jsonOk({ source: 'cache', cachedAt: metadata?.ts, ageSeconds: Math.floor(ageMs / 1000), team, players: cached.players });
+  if (!forceFresh) {
+    const { value: cached, metadata } = await kvGet(env, KV_KEY);
+    if (cached && Array.isArray(cached.players) && cached.players.length > 0) {
+      const ageMs = Date.now() - (metadata?.ts ?? 0);
+      return jsonOk({ source: 'cache', cachedAt: metadata?.ts, ageSeconds: Math.floor(ageMs / 1000), team, players: cached.players });
+    }
   }
 
   const target = `${backendBaseUrl(env)}/api/team_top_players?team=${encodeURIComponent(team)}&n=${encodeURIComponent(n)}`;

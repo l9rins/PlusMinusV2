@@ -5,6 +5,11 @@
 
 /* ── DESIGN TOKENS ─────────────────────────────────────────────────────────── */
 :root {
+  --shadow-sharp: 4px 4px 0px rgba(0,0,0,1);
+  --shadow-hover: 8px 8px 0px rgba(0,0,0,1);
+  --transition-sharp: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --border-stark: 2px solid var(--border);
+
   /* Backgrounds — darkest to lightest */
   --bg: #05050a;
   --bg2: #0c0c14;
@@ -60,12 +65,64 @@ html {
   color-scheme: dark;
 }
 
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 260ms;
+  animation-timing-function: var(--decel);
+}
+
+::view-transition-old(root) {
+  animation-name: pmPageExit;
+}
+
+::view-transition-new(root) {
+  animation-name: pmPageEnter;
+}
+
+@keyframes pmPageExit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(.985);
+    filter: blur(6px);
+  }
+}
+
+@keyframes pmPageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(.985);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
 body {
   font-family: var(--body);
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 1ms;
+    animation-timing-function: linear;
+  }
 }
 
 button {
@@ -180,7 +237,7 @@ img {
   width: 5px;
   height: 5px;
   background: var(--coral);
-  border-radius: 50%;
+  border-radius: 0;
   flex-shrink: 0;
 }
 
@@ -650,4 +707,26 @@ img {
 ::selection {
   background: rgba(197, 248, 42, .25);
   color: var(--text);
+}
+
+.card, .panel, .data-card, .widget {
+  border: var(--border-stark) !important;
+  box-shadow: var(--shadow-sharp) !important;
+  transition: var(--transition-sharp) !important;
+}
+
+.card:hover, .panel:hover, .data-card:hover, .widget:hover, tr:hover td {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: var(--shadow-hover) !important;
+}
+
+.btn, button, .chip, .badge {
+  border: var(--border-stark) !important;
+  box-shadow: 2px 2px 0px rgba(0,0,0,1) !important;
+  transition: var(--transition-sharp) !important;
+}
+
+.btn:hover, button:hover, .chip:hover, .badge:hover {
+  transform: translate(-1px, -1px) !important;
+  box-shadow: 4px 4px 0px rgba(0,0,0,1) !important;
 }

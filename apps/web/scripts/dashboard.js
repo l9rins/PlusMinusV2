@@ -436,6 +436,7 @@ const LAB_STATE = {
   restEdge: true,
   selected: [],
   advancedData: null,
+  rosterReady: true,
 };
 
 function _hashString(str) {
@@ -464,7 +465,7 @@ function _pct(n) {
   return `${Math.round(Number(n || 0))}%`;
 }
 
-function getLabPlayers() {
+function getLabComparePlayers() {
   const byName = new Map(LAB_FALLBACK_PLAYERS.map(p => [p.name, { ...p }]));
   const cats = { pts: 'pts', reb: 'reb', ast: 'ast', stl: 'stl', blk: 'blk', tpm: 'tpm' };
   Object.entries(cats).forEach(([cat, key]) => {
@@ -489,6 +490,24 @@ function getLabPlayers() {
     blk: Number(p.blk ?? _range(`${p.name}:blk`, .2, 2.3, 1)),
     tpm: Number(p.tpm ?? _range(`${p.name}:tpm`, .8, 4.5, 1)),
   }));
+}
+
+function getLabPlayers() {
+  return getLabComparePlayers();
+}
+
+function getLabRosterPlayers() {
+  return currentRoster().map(player => ({
+    ...player,
+    name: String(player?.name || '').trim(),
+    position: String(player?.position || player?.pos || player?.role || '').trim(),
+    team: LAB_STATE.team,
+  })).filter(player => player.name);
+}
+
+function formatLabPlayerLabel(player) {
+  const position = String(player?.position || player?.pos || player?.role || '').trim();
+  return position ? `${player.name} / ${position}` : `${player.name} / ${player.team || LAB_STATE.team || 'NBA'}`;
 }
 
 function buildPlayerProfile(name) {
@@ -925,6 +944,10 @@ function renderContextCards(profile) {
 function renderAnalyticsLab() {
   const panel = document.getElementById('analyticsLab');
   if (!panel) return;
+  if (!LAB_STATE.rosterReady) {
+    renderAnalyticsLabSkeleton();
+    return;
+  }
   try {
     const player = buildPlayerProfile(LAB_STATE.player);
     const compareName = LAB_STATE.compare === LAB_STATE.player ? LAB_FALLBACK_PLAYERS[1].name : LAB_STATE.compare;
@@ -941,16 +964,115 @@ function renderAnalyticsLab() {
   }
 }
 
-function populateLabSelects() {
-  const players = getLabPlayers();
+function renderAnalyticsLabSkeleton() {
+  setAnalyticsControlsEnabled(false);
+
   const playerSelect = document.getElementById('advancedPlayerSelect');
   const compareSelect = document.getElementById('advancedCompareSelect');
-  [playerSelect, compareSelect].forEach(select => {
+  const teamSelect = document.getElementById('lineupTeamSelect');
+  const metricGrid = document.getElementById('advancedMetricGrid');
+  const shotSvg = document.getElementById('shotChartSvg');
+  const shotLegend = document.getElementById('shotZoneLegend');
+  const radarSvg = document.getElementById('radarChartSvg');
+  const winProbSvg = document.getElementById('winProbChartSvg');
+  const contextCards = document.getElementById('contextCards');
+  const lineupPool = document.getElementById('lineupPool');
+  const lineupSummary = document.getElementById('lineupSummary');
+  const matchupMatrix = document.getElementById('matchupMatrix');
+  const pairingList = document.getElementById('pairingList');
+  const propCards = document.getElementById('propContextCards');
+  const dataPipeline = document.getElementById('dataPipelineList');
+
+  [playerSelect, compareSelect, teamSelect].forEach(select => {
     if (!select) return;
-    const current = select.value || (select === playerSelect ? LAB_STATE.player : LAB_STATE.compare);
-    select.innerHTML = players.map(p => `<option value="${esc(p.name)}">${esc(p.name)} / ${esc(p.team || 'NBA')}</option>`).join('');
-    select.value = players.some(p => p.name === current) ? current : players[0]?.name;
+    select.disabled = true;
+    select.innerHTML = '<option>Loading…</option>';
   });
+
+  if (metricGrid) {
+    metricGrid.innerHTML = `
+      <div class="skeleton-line" style="height:76px;border-radius:16px"></div>
+      <div class="skeleton-line" style="height:76px;border-radius:16px"></div>
+      <div class="skeleton-line" style="height:76px;border-radius:16px"></div>
+      <div class="skeleton-line" style="height:76px;border-radius:16px"></div>`;
+  }
+  if (shotSvg) shotSvg.innerHTML = `<div class="skeleton-line" style="height:260px;border-radius:18px"></div>`;
+  if (shotLegend) shotLegend.innerHTML = `<div class="skeleton-line" style="height:18px;width:70%"></div>`;
+  if (radarSvg) radarSvg.innerHTML = `<div class="skeleton-line" style="height:260px;border-radius:18px"></div>`;
+  if (winProbSvg) winProbSvg.innerHTML = `<div class="skeleton-line" style="height:260px;border-radius:18px"></div>`;
+  if (contextCards) contextCards.innerHTML = `<div class="skeleton-line" style="height:56px;border-radius:14px"></div><div class="skeleton-line" style="height:56px;border-radius:14px"></div><div class="skeleton-line" style="height:56px;border-radius:14px"></div><div class="skeleton-line" style="height:56px;border-radius:14px"></div>`;
+
+  if (lineupPool) {
+    lineupPool.innerHTML = Array.from({ length: 5 }, () => `<div class="skeleton-line" style="height:34px;border-radius:12px;margin-bottom:10px"></div>`).join('');
+  }
+  if (lineupSummary) lineupSummary.innerHTML = `<div class="skeleton-line" style="height:64px;border-radius:16px"></div>`;
+  if (matchupMatrix) matchupMatrix.innerHTML = Array.from({ length: 4 }, () => `<div class="skeleton-line" style="height:30px;border-radius:10px;margin-bottom:8px"></div>`).join('');
+  if (pairingList) pairingList.innerHTML = Array.from({ length: 3 }, () => `<div class="skeleton-line" style="height:30px;border-radius:10px;margin-bottom:8px"></div>`).join('');
+  if (propCards) propCards.innerHTML = Array.from({ length: 3 }, () => `<div class="skeleton-line" style="height:58px;border-radius:14px;margin-bottom:10px"></div>`).join('');
+  if (dataPipeline) dataPipeline.innerHTML = `<div class="skeleton-line" style="height:80px;border-radius:16px"></div>`;
+
+  const freshness = document.getElementById('analyticsFreshness');
+  if (freshness) {
+    freshness.textContent = 'LOADING';
+    freshness.className = 'panel-badge muted';
+  }
+}
+
+function setAnalyticsControlsEnabled(enabled) {
+  const controls = [
+    ...document.querySelectorAll('.metric-toggle'),
+    ...document.querySelectorAll('.shot-toggle'),
+  ];
+  controls.forEach(btn => { btn.disabled = !enabled; });
+
+  const garbage = document.getElementById('garbageFilter');
+  const gatherBtn = document.getElementById('dataGatherBtn');
+  const nlBtn = document.getElementById('nlSearchBtn');
+  const shareBtn = document.getElementById('shareRadarBtn');
+  const teamSelect = document.getElementById('lineupTeamSelect');
+  const playerSelect = document.getElementById('advancedPlayerSelect');
+  const compareSelect = document.getElementById('advancedCompareSelect');
+
+  [garbage, gatherBtn, nlBtn, shareBtn, teamSelect, playerSelect, compareSelect].forEach(el => {
+    if (!el) return;
+    el.disabled = !enabled;
+  });
+}
+
+function populateLabSelects() {
+  if (!LAB_STATE.rosterReady) {
+    const loadingMarkup = '<option>Loading…</option>';
+    const playerSelect = document.getElementById('advancedPlayerSelect');
+    const compareSelect = document.getElementById('advancedCompareSelect');
+    const teamSelect = document.getElementById('lineupTeamSelect');
+    if (playerSelect) {
+      playerSelect.innerHTML = loadingMarkup;
+      playerSelect.disabled = true;
+    }
+    if (compareSelect) {
+      compareSelect.innerHTML = loadingMarkup;
+      compareSelect.disabled = true;
+    }
+    if (teamSelect) {
+      teamSelect.disabled = true;
+    }
+    return;
+  }
+
+  const rosterPlayers = getLabRosterPlayers();
+  const comparePlayers = getLabComparePlayers();
+  const playerSelect = document.getElementById('advancedPlayerSelect');
+  const compareSelect = document.getElementById('advancedCompareSelect');
+  if (playerSelect) {
+    const current = playerSelect.value || LAB_STATE.player;
+    playerSelect.innerHTML = rosterPlayers.map(p => `<option value="${esc(p.name)}">${esc(formatLabPlayerLabel(p))}</option>`).join('');
+    playerSelect.value = rosterPlayers.some(p => p.name === current) ? current : rosterPlayers[0]?.name;
+  }
+  if (compareSelect) {
+    const current = compareSelect.value || LAB_STATE.compare;
+    compareSelect.innerHTML = comparePlayers.map(p => `<option value="${esc(p.name)}">${esc(p.name)} / ${esc(p.team || 'NBA')}</option>`).join('');
+    compareSelect.value = comparePlayers.some(p => p.name === current) ? current : comparePlayers[0]?.name;
+  }
   LAB_STATE.player = playerSelect?.value || LAB_STATE.player;
   LAB_STATE.compare = compareSelect?.value || LAB_STATE.compare;
 }
@@ -958,6 +1080,72 @@ function populateLabSelects() {
 function currentRoster() {
   return LAB_TEAM_ROSTERS[LAB_STATE.team] || LAB_TEAM_ROSTERS.OKC;
 }
+
+function syncAnalyticsLabRoster(team, rosterData) {
+  const normalizedTeam = String(team || '').trim().toUpperCase();
+  if (!normalizedTeam || !Array.isArray(rosterData) || rosterData.length === 0) return false;
+
+  const existingRoster = LAB_TEAM_ROSTERS[normalizedTeam] || [];
+  const fallbackRoles = ['creator', 'wing', 'connector', 'stopper', 'rim', 'guard', 'big'];
+  const nextRoster = rosterData.map((player, index) => {
+    const normalized = typeof normalizeRosterPlayer === 'function'
+      ? normalizeRosterPlayer(player)
+      : { name: String(player?.name || player?.fullName || player?.playerName || 'Unknown') };
+    const existing = existingRoster.find(entry => entry.name === normalized.name) || {};
+    const usage = Number.isFinite(existing.usage) ? existing.usage : Number(normalized.usage || player?.usage || 0);
+    const impact = Number.isFinite(existing.impact)
+      ? existing.impact
+      : Number.isFinite(normalized.plus_minus) && normalized.plus_minus !== 0
+        ? Number(normalized.plus_minus) / 5
+        : (Number(normalized.pts) || 0) * 0.18
+          + (Number(normalized.reb) || 0) * 0.12
+          + (Number(normalized.ast) || 0) * 0.14
+          + (Number(normalized.stl) || 0) * 0.35
+          + (Number(normalized.blk) || 0) * 0.35
+          - (Number(normalized.tov) || 0) * 0.15;
+
+    return {
+      name: normalized.name,
+      position: normalized.position || player?.position || player?.pos || existing.position || existing.role || '',
+      role: existing.role || player?.role || fallbackRoles[index % fallbackRoles.length],
+      impact: Number(impact.toFixed(1)),
+      usage,
+      personId: player?.personId ?? player?.player_id ?? player?.id ?? existing.personId ?? null,
+      pts: normalized.pts,
+      reb: normalized.reb,
+      ast: normalized.ast,
+      stl: normalized.stl,
+      blk: normalized.blk,
+      tov: normalized.tov,
+      orb: normalized.orb,
+      drb: normalized.drb,
+      plus_minus: normalized.plus_minus,
+      tsPct: normalized.tsPct,
+    };
+  });
+
+  LAB_TEAM_ROSTERS[normalizedTeam] = nextRoster;
+
+  if (LAB_STATE.team === normalizedTeam) {
+    LAB_STATE.rosterReady = true;
+    const rosterNames = new Set(nextRoster.map(player => player.name));
+    const preservedSelection = LAB_STATE.selected.filter(name => rosterNames.has(name));
+    LAB_STATE.selected = preservedSelection.length ? preservedSelection : nextRoster.slice(0, 5).map(player => player.name);
+
+    if (!rosterNames.has(LAB_STATE.player)) LAB_STATE.player = nextRoster[0]?.name || LAB_STATE.player;
+    if (!rosterNames.has(LAB_STATE.compare) || LAB_STATE.compare === LAB_STATE.player) {
+      LAB_STATE.compare = nextRoster[1]?.name || LAB_STATE.player;
+    }
+
+    setAnalyticsControlsEnabled(true);
+    populateLabSelects();
+    renderAnalyticsLab();
+    renderLineupLab();
+  }
+
+  return true;
+}
+window.syncAnalyticsLabRoster = syncAnalyticsLabRoster;
 
 function renderLineupPool() {
   const pool = document.getElementById('lineupPool');
@@ -1127,6 +1315,10 @@ function renderDataPipeline() {
 function renderLineupLab() {
   const panel = document.getElementById('lineupLab');
   if (!panel) return;
+  if (!LAB_STATE.rosterReady) {
+    renderAnalyticsLabSkeleton();
+    return;
+  }
   renderLineupPool();
   renderLineupSummary();
   renderMatchupsAndPairs();
@@ -1257,6 +1449,12 @@ function initAnalyticsLab() {
   // Sync lab team with page context
   const pageTeam = (window.TEAM_ABBR || new URLSearchParams(window.location.search).get('team') || '').toUpperCase();
   if (pageTeam) {
+    LAB_STATE.team = pageTeam;
+    LAB_STATE.rosterReady = false;
+    LAB_STATE.player = '';
+    LAB_STATE.compare = '';
+    LAB_STATE.selected = [];
+
     // If team isn't hardcoded but we have ROSTER_DATA on team.js, dynamically populate it
     if (!LAB_TEAM_ROSTERS[pageTeam] && typeof ROSTER_DATA !== 'undefined' && typeof normalizeRosterPlayer !== 'undefined' && ROSTER_DATA.length) {
       LAB_TEAM_ROSTERS[pageTeam] = ROSTER_DATA.map(p => {
@@ -1276,20 +1474,6 @@ function initAnalyticsLab() {
         };
       }).sort((a, b) => b.impact - a.impact);
     }
-    
-    if (LAB_TEAM_ROSTERS[pageTeam]) {
-      LAB_STATE.team = pageTeam;
-      // Auto-select the team's top players for lineup lab
-      if (!LAB_STATE.selected.length) {
-        LAB_STATE.selected = LAB_TEAM_ROSTERS[pageTeam].slice(0, 5).map(p => p.name);
-      }
-      // Set player/compare to team players if available
-      const teamPlayers = LAB_TEAM_ROSTERS[pageTeam];
-      if (teamPlayers && teamPlayers.length >= 2) {
-        LAB_STATE.player = teamPlayers[0].name;
-        LAB_STATE.compare = teamPlayers[1].name;
-      }
-    }
   } else if (!LAB_STATE.selected.length) {
     LAB_STATE.selected = currentRoster().slice(0, 5).map(p => p.name);
   }
@@ -1302,7 +1486,7 @@ function initAnalyticsLab() {
   const minutes = document.getElementById('propThreshold');
   const minutesVal = document.getElementById('propThresholdVal');
   const rest = document.getElementById('propRestToggle');
-  if (teamSelect && !teamSelect.dataset.optionsBound) {
+  if (teamSelect && !teamSelect.dataset.optionsBound && LAB_STATE.rosterReady) {
     teamSelect.innerHTML = Object.keys(LAB_TEAM_ROSTERS).map(t => `<option value="${t}">${t}</option>`).join('');
     teamSelect.value = LAB_STATE.team;
     teamSelect.dataset.optionsBound = '1';
@@ -1400,9 +1584,14 @@ function initAnalyticsLab() {
     shareBtn.dataset.bound = '1';
   }
   try {
-    renderAnalyticsLab();
-    renderLineupLab();
-    runNaturalSearch();
+    if (LAB_STATE.rosterReady) {
+      renderAnalyticsLab();
+      renderLineupLab();
+      runNaturalSearch();
+    } else {
+      renderAnalyticsLabSkeleton();
+      renderLineupLab();
+    }
   } catch (err) {
     console.warn('[PM] Analytics lab init render error:', err);
   }

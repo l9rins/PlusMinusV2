@@ -19,6 +19,13 @@ try:
 except ImportError:
     from nba_source import fetch_team_top_players
     from features import PLAYER_STAT_COLS, PLAYER_TOP_N
+try:
+    from apps.api.features import STAT_COLS
+except ImportError:
+    try:
+        from features import STAT_COLS
+    except ImportError:
+        STAT_COLS = []
 
 MODEL_PATH = Path(__file__).parent / "model.joblib"
 SCALER_PATH = Path(__file__).parent / "scaler.joblib"
@@ -187,8 +194,8 @@ def predict_proba(
         return {"home_win": round(p_home, 4), "away_win": round(1 - p_home, 4), "source": "elo_fallback"}
 
     row = {}
-    all_feat_cols = [f"avg_{c}" for c in __import__("features").STAT_COLS]
-    all_feat_cols += [f"avg_OPP_{c}" for c in __import__("features").STAT_COLS]
+    all_feat_cols = [f"avg_{c}" for c in STAT_COLS]
+    all_feat_cols += [f"avg_OPP_{c}" for c in STAT_COLS]
     all_feat_cols += ["avg_Win", "avg_PointDiff", "Form", "Streak"]
 
     for feat in all_feat_cols:
