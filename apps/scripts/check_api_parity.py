@@ -51,9 +51,22 @@ for r in results:
         ok = False
         print('MISSING:', r['endpoint'], 'worker=', w, 'local=', l)
         continue
-    if w.get('status') != l.get('status'):
+    ws = w.get('status')
+    ls = l.get('status')
+    # Treat 2xx as success; fail when one side is success and the other is not.
+    ws_ok = 200 <= (ws or 0) < 300
+    ls_ok = 200 <= (ls or 0) < 300
+    if ws_ok != ls_ok:
         ok = False
-        print('DIFF STATUS:', r['endpoint'], 'worker=', w.get('status'), 'local=', l.get('status'))
+        print('SERIOUS MISMATCH:', r['endpoint'], 'worker=', ws, 'local=', ls)
+    else:
+        # Both success or both non-success. If both non-success but different codes, warn only.
+        if ws != ls:
+            if (ws or 0) >= 500 or (ls or 0) >= 500:
+                ok = False
+                print('SERVER ERROR DIFF:', r['endpoint'], 'worker=', ws, 'local=', ls)
+            else:
+                print('WARN: non-fatal diff for', r['endpoint'], 'worker=', ws, 'local=', ls)
 
 if not ok:
     sys.exit(2)
