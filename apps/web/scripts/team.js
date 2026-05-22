@@ -356,38 +356,24 @@ async function fetchRecentScheduleHistory() {
 
 async function fetchRoster() {
   const freshToken = Date.now();
-  const base = typeof resolvePredictionApiBase === 'function' ? resolvePredictionApiBase() : (window.PRED_BACKEND || '').replace(/\/+$/, '');
-  let json = null;
-
-  if (/localhost|127\.0\.0\.1/i.test(base)) {
-    const rosterUrl = `${base}/api/full_roster?team=${encodeURIComponent(TEAM_ABBR)}&fresh=1&ts=${freshToken}`;
-    try {
-      const response = await fetch(rosterUrl, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`full_roster ${response.status}`);
-      json = await response.json();
-    } catch (err) {
-      console.warn('[PM] full_roster fetch failed, falling back to team_top_players:', err.message);
-      json = await workerFetch(`/api/team_top_players?team=${TEAM_ABBR}&n=10&fresh=1&ts=${freshToken}`, 12000, 0);
-    }
-  } else {
-    json = await workerFetch(`/api/team_top_players?team=${TEAM_ABBR}&n=10&fresh=1&ts=${freshToken}`, 12000, 0);
+  const rosterPath = `/api/team_top_players?team=${TEAM_ABBR}&n=10&fresh=1&ts=${freshToken}`;
+  try {
+    const json = await backendFirstFetch(rosterPath, 12000, 0);
+    return normalizeTopPlayersResponse(json);
+  } catch (err) {
+    console.warn('[PM] fetchRoster failed:', err.message);
+    try { window.showNonBlockingError?.(`Roster load failed: ${err.message}`); } catch {}
+    throw err;
   }
-
-  return normalizeTopPlayersResponse(json);
 }
 
 async function fetchRosterWithRetry(attempt = 0) {
-  try {
+  return await retryFetch(async () => {
     const roster = await fetchRoster();
     const rawRoster = Array.isArray(roster) ? roster : (roster?.players || []);
-    if (rawRoster.length) return roster;
-  } catch (err) {
-    if (attempt >= 2) throw err;
-  }
-
-  if (attempt >= 2) return null;
-  await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-  return await fetchRosterWithRetry(attempt + 1);
+    if (!rawRoster.length) throw new Error('empty roster');
+    return roster;
+  }, 3, 800).catch(() => null);
 }
 
 async function loadInjurySnapshot() {
@@ -966,6 +952,9 @@ function renderRoster() {
       </td>`;
   }
 
+  // Remove loading ARIA attributes when actual roster is rendered
+  try { tbody.removeAttribute('aria-busy'); tbody.removeAttribute('role'); } catch {}
+
   tbody.innerHTML = sorted.map((normalized, i) => {
     const mpg = Number(normalized.min || 0).toFixed(1);
     const pts = Number(normalized.pts || 0).toFixed(1);
@@ -1064,6 +1053,8 @@ function renderRoster() {
 function renderRosterSkeleton() {
   const tbody = document.getElementById('rosterTableBody');
   if (!tbody) return;
+  // Accessibility: indicate loading to assistive tech
+  try { tbody.setAttribute('aria-busy', 'true'); tbody.setAttribute('role', 'status'); } catch {}
   const rows = Array.from({ length: 7 }, (_, index) => {
     const shimmerWidth = 68 - index * 4;
     return `

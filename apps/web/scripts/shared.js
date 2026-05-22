@@ -257,6 +257,125 @@ async function workerFetch(path, timeoutMs = 9000, retries = 2) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Higher-level fetch helpers: backend-first, retry wrapper, and debug UI
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Try the prediction backend first (resolvePredictionApiBase()), then fall back to the worker.
+ * Returns parsed JSON. Also emits a small on-screen badge for debugging.
+ */
+async function backendFirstFetch(path, timeoutMs = 9000, retries = 2) {
+  if (PM_IS_FILE) return null;
+  const freshTs = Date.now();
+  const usesBackend = path.startsWith('/api/');
+  const primaryBase = resolvePredictionApiBase();
+  const fallbackBase = (primaryBase === PM_LOCAL_BACKEND) ? PM_WORKER : null;
+
+  // Try direct backend first when appropriate
+  if (usesBackend && primaryBase) {
+    try {
+      const url = `${primaryBase}${path}`;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`backend ${res.status}`);
+      const json = await res.json();
+      try { showDataSourceBadge('backend', json?.cachedAt ?? freshTs); } catch {}
+      return json;
+    } catch (err) {
+      console.warn('[PM] backendFirstFetch primary failed:', err.message);
+      // fall through to worker
+    }
+  }
+
+  // Fallback to workerFetch (which already implements its own fallback/backoff)
+  try {
+    const json = await workerFetch(path, timeoutMs, retries);
+    try { showDataSourceBadge('worker', json?.cachedAt ?? Date.now()); } catch {}
+    return json;
+  } catch (err) {
+    try { showDataSourceBadge('error', Date.now()); } catch {}
+    throw err;
+  }
+}
+
+/** Generic retry wrapper with exponential backoff. `fn` should be a function that returns a Promise. */
+async function retryFetch(fn, attempts = 3, baseDelayMs = 500) {
+  let attempt = 0;
+  while (attempt < attempts) {
+    try {
+      return await fn();
+    } catch (err) {
+      attempt++;
+      if (attempt >= attempts) throw err;
+      const delay = baseDelayMs * Math.pow(2, attempt - 1);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
+// Simple on-screen badge to show last data source and approximate timestamp
+function showDataSourceBadge(source, ts) {
+  try {
+    let el = document.getElementById('pm-data-source-badge');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'pm-data-source-badge';
+      el.className = 'pm-debug-badge';
+      document.body.appendChild(el);
+    }
+    const when = ts ? new Date(ts).toLocaleTimeString() : 'now';
+    el.textContent = `${source.toUpperCase()} · ${when}`;
+    el.dataset.source = source;
+    // Fade out after a short while for non-error states
+    if (source !== 'error') {
+      el.style.opacity = '1';
+      clearTimeout(el._hideTimer);
+      el._hideTimer = setTimeout(() => { el.style.opacity = '0.14'; }, 3500);
+    } else {
+      // Error state remains visible longer
+      el.style.opacity = '1';
+      clearTimeout(el._hideTimer);
+      el._hideTimer = setTimeout(() => { el.style.opacity = '0.6'; }, 12000);
+    }
+  } catch (e) { /* best-effort UI */ }
+}
+
+function showNonBlockingError(msg, ttl = 7000) {
+  try {
+    let el = document.getElementById('pm-notice-container');
+    if (!el) { el = document.createElement('div'); el.id = 'pm-notice-container'; document.body.appendChild(el); }
+    const note = document.createElement('div');
+    note.className = 'pm-toast';
+    note.textContent = msg;
+    el.appendChild(note);
+    setTimeout(() => { note.classList.add('dismiss'); setTimeout(() => note.remove(), 400); }, ttl);
+  } catch (e) { console.warn('[PM] showNonBlockingError failed', e.message); }
+}
+
+// Expose helpers for other modules
+window.backendFirstFetch = backendFirstFetch;
+window.retryFetch = retryFetch;
+window.showDataSourceBadge = showDataSourceBadge;
+window.showNonBlockingError = showNonBlockingError;
+
+// Lightweight telemetry helper — best-effort, uses navigator.sendBeacon when possible.
+function pmEmitMetric(name, payload = {}) {
+  try {
+    const body = JSON.stringify({ name, ts: Date.now(), payload });
+    const url = (typeof resolvePredictionApiBase === 'function' ? resolvePredictionApiBase() : PM_WORKER) + '/api/telemetry';
+    if (navigator && typeof navigator.sendBeacon === 'function') {
+      navigator.sendBeacon(url, body);
+    } else {
+      fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
+    }
+  } catch (e) { console.debug('[PM] pmEmitMetric failed', e.message); }
+}
+window.pmEmitMetric = pmEmitMetric;
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED: Stale-while-revalidate fetch helper

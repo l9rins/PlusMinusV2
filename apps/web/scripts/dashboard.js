@@ -948,6 +948,8 @@ function renderAnalyticsLab() {
     renderAnalyticsLabSkeleton();
     return;
   }
+  // Remove loading ARIA when showing real content
+  try { panel.removeAttribute('aria-busy'); panel.removeAttribute('role'); } catch {}
   try {
     const player = buildPlayerProfile(LAB_STATE.player);
     const compareName = LAB_STATE.compare === LAB_STATE.player ? LAB_FALLBACK_PLAYERS[1].name : LAB_STATE.compare;
@@ -966,6 +968,8 @@ function renderAnalyticsLab() {
 
 function renderAnalyticsLabSkeleton() {
   setAnalyticsControlsEnabled(false);
+  const panel = document.getElementById('analyticsLab');
+  try { if (panel) { panel.setAttribute('aria-busy', 'true'); panel.setAttribute('role', 'status'); } } catch {}
 
   const playerSelect = document.getElementById('advancedPlayerSelect');
   const compareSelect = document.getElementById('advancedCompareSelect');
