@@ -1251,6 +1251,18 @@ async function handleTeamTopPlayers(env, url) {
 // /api/predict and /api/slate  — proxy to Python backend
 // ─────────────────────────────────────────────────────────────────────────────
 async function handleBackendDataProxy(env, url, endpoint, timeoutMs = 12000) {
+  // Validate required parameters for some endpoints so the Worker mirrors
+  // the backend's parameter validation (helps parity between worker and backend).
+  const team = (url.searchParams.get('team') ?? '').trim();
+  const playerId = (url.searchParams.get('player_id') ?? '').trim();
+
+  if (['/api/full_roster', '/api/team_top_players', '/api/lineups', '/api/shot_zones', '/api/play_types'].includes(endpoint)) {
+    if (!team) return new Response(JSON.stringify({ detail: 'Missing required query parameter: team' }), { status: 422, headers: { ...CORS, 'Content-Type': 'application/json' } });
+  }
+  if (endpoint === '/api/playerlog' && !playerId) {
+    return new Response(JSON.stringify({ detail: 'Missing required query parameter: player_id' }), { status: 422, headers: { ...CORS, 'Content-Type': 'application/json' } });
+  }
+
   const qs = url.searchParams.toString();
   const target = `${backendBaseUrl(env)}${endpoint}${qs ? `?${qs}` : ''}`;
   return proxyBackendJson(target, timeoutMs);

@@ -23,7 +23,15 @@ results = []
 for ep in ENDPOINTS:
     out = { 'endpoint': ep, 'worker': None, 'local': None }
     for name, base in [('worker', WORKER), ('local', LOCAL)]:
-        url = base.rstrip('/') + ep
+        # supply sample query params for endpoints that require them
+        params = ''
+        if ep == '/api/full_roster' or ep == '/api/team_top_players':
+            params = '?team=LAL&n=10'
+        elif ep == '/api/playerlog':
+            params = '?player_id=201939'
+        elif ep == '/api/lineups' or ep == '/api/shot_zones':
+            params = f'?team=LAL'
+        url = base.rstrip('/') + ep + params
         try:
             r = requests.get(url, timeout=6)
             out[name] = { 'status': r.status_code }
