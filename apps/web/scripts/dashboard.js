@@ -1349,7 +1349,7 @@ async function gatherAdvancedContext() {
     const logs = await Promise.allSettled(
       topPlayers.map(p => {
         const id = p.personId;
-        return id ? window.workerFetch(`/api/playerlog?player_id=${id}`, 8000, 1) : Promise.resolve([]);
+        return id ? window.backendFirstFetch(`/api/playerlog?player_id=${id}`, 8000, 1) : Promise.resolve([]);
       })
     );
     LAB_STATE.advancedData.logs = {};

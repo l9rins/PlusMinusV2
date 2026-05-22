@@ -216,6 +216,17 @@ app.add_middleware(
 )
 
 
+# Telemetry sink (best-effort): accepts lightweight metrics via POST
+@app.post('/api/telemetry')
+async def receive_telemetry(request: Request):
+    try:
+        payload = await request.json()
+        print('[PM][TELEMETRY]', payload)
+    except Exception as e:
+        print('[PM][TELEMETRY] parse failed', e)
+    return JSONResponse(status_code=204, content={})
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────────────────────────────────────

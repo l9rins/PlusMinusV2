@@ -387,7 +387,7 @@ async function loadInjurySnapshot() {
   const away = opponent;
 
   try {
-    const json = await workerFetch(`/api/predict?home=${home}&away=${away}`, PREDICTION_TIMEOUT_MS, 0);
+    const json = await backendFirstFetch(`/api/predict?home=${home}&away=${away}`, PREDICTION_TIMEOUT_MS, 0);
     const injuries = json?.meta?.injuries || json?.injuries || {};
     const ours = injuries.home || {};
     const outCount = Number(ours.out_count ?? ours.outCount ?? 0);
@@ -403,7 +403,7 @@ async function fetchPrediction(home, away) {
   if (PREDICTIONS[key]) return PREDICTIONS[key];
 
   try {
-    const json = await workerFetch(`/api/predict?home=${home}&away=${away}`, PREDICTION_TIMEOUT_MS, 0);
+    const json = await backendFirstFetch(`/api/predict?home=${home}&away=${away}`, PREDICTION_TIMEOUT_MS, 0);
     // API returns final_probs.home_win / away_win
     const fp = json?.final_probs || json?.layers?.ml_model || {};
     const pred = {
@@ -1496,7 +1496,7 @@ async function enrichRosterPlayers(players) {
     }
 
     try {
-      const json = await workerFetch(`/api/playerlog?player_id=${playerId}`, 15000, 0);
+      const json = await backendFirstFetch(`/api/playerlog?player_id=${playerId}`, 15000, 0);
       const summary = summarizePlayerLogRows(Array.isArray(json?.games) ? json.games : []);
       return { ...player, ...summary };
     } catch {
@@ -2554,7 +2554,7 @@ function renderPlayTypeBreakdown() {
   // try to fetch server-side play-type data if available (fallback to local)
   (async function fetchPlayTypes() {
     try {
-      const data = await workerFetch(`/api/play_types?team=${encodeURIComponent(TEAM_ABBR)}`, 12000, 0);
+      const data = await backendFirstFetch(`/api/play_types?team=${encodeURIComponent(TEAM_ABBR)}`, 12000, 0);
       if (!data || !Array.isArray(data.play_types)) return;
       const serverMax = Math.max(...data.play_types.map(p => Number(p.freq) || 0));
       const html = data.play_types.map(pt => {
@@ -2621,7 +2621,7 @@ async function renderLineupData() {
   renderHeader();
 
   try {
-    const data = await workerFetch(`/api/lineups?team=${encodeURIComponent(TEAM_ABBR)}`, 20000, 0);
+    const data = await backendFirstFetch(`/api/lineups?team=${encodeURIComponent(TEAM_ABBR)}`, 20000, 0);
     if (data && Array.isArray(data.combos) && data.combos.length > 0) {
       LINEUP_COMBOS = data.combos;
       renderHeader();
@@ -2844,7 +2844,7 @@ async function renderShotZoneDensityChart() {
   const grid = document.getElementById('shotChartGrid');
   if (!grid) return;
   try {
-    const json = await workerFetch(`/api/shot_zones?team=${encodeURIComponent(TEAM_ABBR)}`, 12000, 0);
+    const json = await backendFirstFetch(`/api/shot_zones?team=${encodeURIComponent(TEAM_ABBR)}`, 12000, 0);
     const zones = json.zones || {};
     const mapping = [
       { zone: 'Rim', key: 'rim' },
