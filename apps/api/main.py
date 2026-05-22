@@ -222,6 +222,13 @@ async def receive_telemetry(request: Request):
     try:
         payload = await request.json()
         print('[PM][TELEMETRY]', payload)
+        # Persist to local log for diagnostics
+        try:
+            os.makedirs('logs', exist_ok=True)
+            with open(os.path.join('logs','telemetry.log'), 'a', encoding='utf-8') as fh:
+                fh.write(f"{int(time.time())} {payload!r}\n")
+        except Exception as e:
+            print('[PM][TELEMETRY] write failed', e)
     except Exception as e:
         print('[PM][TELEMETRY] parse failed', e)
     return JSONResponse(status_code=204, content={})

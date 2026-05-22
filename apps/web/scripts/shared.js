@@ -261,12 +261,30 @@ async function workerFetch(path, timeoutMs = 9000, retries = 2) {
 // Higher-level fetch helpers: backend-first, retry wrapper, and debug UI
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Per-endpoint fetch policies (timeoutMs, retries)
+const PM_ENDPOINT_POLICY = {
+  '/api/predict': { timeoutMs: 30000, retries: 1 },
+  '/api/playerlog': { timeoutMs: 15000, retries: 1 },
+  '/api/lineups': { timeoutMs: 20000, retries: 1 },
+  '/api/shot_zones': { timeoutMs: 12000, retries: 1 },
+  '/api/play_types': { timeoutMs: 12000, retries: 1 },
+};
+
 /**
  * Try the prediction backend first (resolvePredictionApiBase()), then fall back to the worker.
  * Returns parsed JSON. Also emits a small on-screen badge for debugging.
  */
 async function backendFirstFetch(path, timeoutMs = 9000, retries = 2) {
   if (PM_IS_FILE) return null;
+  // Apply per-endpoint policy if configured
+  for (const prefix in PM_ENDPOINT_POLICY) {
+    if (path.startsWith(prefix)) {
+      const p = PM_ENDPOINT_POLICY[prefix] || {};
+      timeoutMs = p.timeoutMs ?? timeoutMs;
+      retries = (typeof p.retries === 'number') ? p.retries : retries;
+      break;
+    }
+  }
   const freshTs = Date.now();
   const usesBackend = path.startsWith('/api/');
   const primaryBase = resolvePredictionApiBase();
