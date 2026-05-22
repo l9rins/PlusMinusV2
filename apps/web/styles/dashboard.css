@@ -1007,23 +1007,7 @@ body {
   width: 4px;
   height: 4px;
   background: var(--coral);
-  border-radius: 0
-}
-
-.cal-day.has-games.today::after {
-  background: var(--lime)
-}
-
-.cal-day.multi-game {
-  background: rgba(255, 75, 38, .04)
-}
-
-.cal-day.multi-game.today {
-  background: var(--lime-dim)
-}
-
-.cal-day.big-slate {
-  background: rgba(255, 75, 38, .07);
+  border-radius: 0;
   border-color: rgba(255, 75, 38, .12) !important
 }
 
@@ -2078,43 +2062,13 @@ body {
   width: 4px;
   height: 4px;
   flex-shrink: 0;
-  border-radius: 1px
+  border-radius: 0;
 }
 
-.s-l10-dot.w {
-  background: var(--lime)
-}
-
-.s-l10-dot.l {
-  background: rgba(255, 255, 255, .15)
-}
-
-/* â”€â”€ MEDIA QUERIES â”€â”€ */
-@media (max-width:1280px) {
-  .mvp-grid {
-    grid-template-columns: 1fr 1fr 1fr
-  }
-
-  .kpi-row {
-    grid-template-columns: repeat(2, 1fr)
-  }
-}
-
-@media (max-width:1100px) {
-  .dash-grid {
-    grid-template-columns: 1fr
-  }
-
-  .dash-grid .span-2 {
-    grid-column: span 1
-  }
-}
-
-@media (max-width:860px) {
-  body {
-    flex-direction: column;
+@media (max-width: 860px) {
+  .standings-list-wrap {
     height: auto;
-    overflow: auto
+    overflow: auto;
   }
 
   /* Sidebar header stays visible as a top bar */
@@ -2489,7 +2443,7 @@ body {
   right: 24px;
   width: 48px;
   height: 48px;
-  border-radius: 50%;
+  border-radius: 0;
   background-color: var(--lime);
   color: var(--bg2);
   border: none;
@@ -2555,7 +2509,7 @@ body {
   border: 1px solid var(--border);
   color: var(--text);
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: 0;
   font-family: var(--body);
   font-size: 13px;
   outline: none;
@@ -2568,7 +2522,7 @@ body {
   color: var(--bg2);
   border: none;
   padding: 8px 16px;
-  border-radius: 4px;
+  border-radius: 0;
   font-weight: 600;
   cursor: pointer;
   font-family: var(--body);
@@ -2592,7 +2546,7 @@ body {
   height: 16px;
   border: 2px solid var(--border);
   border-top-color: var(--lime);
-  border-radius: 50%;
+  border-radius: 0;
   animation: pm-spin 1s linear infinite;
   margin: 8px auto;
 }
@@ -2614,7 +2568,7 @@ body {
   font-weight: 700;
   letter-spacing: 1px;
   padding: 2px 5px;
-  border-radius: 3px;
+  border-radius: 0;
   margin-left: 4px;
   vertical-align: middle;
 }
